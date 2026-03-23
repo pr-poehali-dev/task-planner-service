@@ -5,8 +5,6 @@ import {
   type Employee,
   type Branch,
   type Category,
-  MOCK_TASKS,
-  MOCK_CATEGORIES,
   getDaysInMonth,
   getWeekdayName,
   isWeekend,
@@ -25,7 +23,6 @@ interface Props {
 export default function PlannerPage({
   currentUser,
   branches,
-  employees,
   categories,
   tasks,
   onTasksChange,
@@ -34,16 +31,22 @@ export default function PlannerPage({
   const userBranches = branches.filter((b) =>
     currentUser.branchIds.includes(b.id)
   );
-  const [activeBranchId, setActiveBranchId] = useState(
-    userBranches[0]?.id || ""
-  );
+  const [activeBranchId, setActiveBranchId] = useState(userBranches[0]?.id || "");
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskType, setNewTaskType] = useState<"permanent" | "variable">("variable");
   const [addingTask, setAddingTask] = useState(false);
+  const [showToday, setShowToday] = useState(false);
 
   const days = getDaysInMonth(currentMonth);
+
+  const today = new Date();
+  const todayDay =
+    today.getMonth() + 1 === parseInt(currentMonth.split("-")[1]) &&
+    today.getFullYear() === parseInt(currentMonth.split("-")[0])
+      ? today.getDate()
+      : null;
 
   const branchTasks = tasks.filter(
     (t) =>
@@ -53,6 +56,16 @@ export default function PlannerPage({
   );
   const permanentTasks = branchTasks.filter((t) => t.type === "permanent");
   const variableTasks = branchTasks.filter((t) => t.type === "variable");
+
+  // Today's tasks across ALL branches
+  const todayTasks = todayDay
+    ? tasks.filter(
+        (t) =>
+          t.employeeId === currentUser.id &&
+          t.monthYear === currentMonth &&
+          (t.scheduledDates.includes(todayDay) || t.completedDates.includes(todayDay))
+      )
+    : [];
 
   function toggleDate(taskId: string, day: number) {
     onTasksChange(
@@ -119,31 +132,29 @@ export default function PlannerPage({
     return categories.find((c) => c.id === categoryId);
   }
 
-  const today = new Date();
-  const todayDay = today.getMonth() + 1 === parseInt(currentMonth.split("-")[1]) &&
-    today.getFullYear() === parseInt(currentMonth.split("-")[0])
-    ? today.getDate() : null;
+  function getBranchName(branchId: string) {
+    return branches.find((b) => b.id === branchId)?.name || branchId;
+  }
 
-  const totalTasks = branchTasks.length;
-  const completedTasks = branchTasks.filter((t) => t.scheduledDates.length > 0 &&
-    t.scheduledDates.every((d) => t.completedDates.includes(d)) && t.scheduledDates.length > 0).length;
-  const conversionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const totalScheduled = branchTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
+  const totalCompleted = branchTasks.reduce((acc, t) => acc + t.completedDates.length, 0);
+  const conversionRate = totalScheduled > 0 ? Math.round((totalCompleted / totalScheduled) * 100) : 0;
 
   const TASK_COL_WIDTH = 220;
   const DATE_COL_WIDTH = 32;
 
   return (
     <div className="h-full flex flex-col animate-fade-in">
-      {/* Branch tabs + stats */}
-      <div className="px-6 pt-5 pb-0 flex items-start justify-between gap-4 flex-shrink-0">
+      {/* Top row: branch tabs + controls */}
+      <div className="px-6 pt-5 pb-0 flex items-end justify-between gap-4 flex-shrink-0 border-b border-border">
         <div className="flex gap-1">
           {userBranches.map((b) => (
             <button
               key={b.id}
               onClick={() => setActiveBranchId(b.id)}
-              className={`px-4 py-2 text-xs font-medium rounded-t-md transition-colors border-b-2 ${
+              className={`px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
                 activeBranchId === b.id
-                  ? "border-accent text-accent bg-accent/5"
+                  ? "border-accent text-accent"
                   : "border-transparent text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -151,28 +162,138 @@ export default function PlannerPage({
             </button>
           ))}
         </div>
-        <div className="flex items-center gap-4 text-xs text-muted-foreground pb-2">
-          <span>
-            Всего задач: <strong className="text-foreground">{totalTasks}</strong>
-          </span>
-          <span>
-            Выполнено:{" "}
-            <strong className="text-success">{completedTasks}</strong>
-          </span>
-          <span>
-            Конверсия:{" "}
-            <strong className={conversionRate >= 70 ? "text-success" : conversionRate >= 40 ? "text-warning" : "text-destructive"}>
-              {conversionRate}%
-            </strong>
-          </span>
+
+        <div className="flex items-center gap-3 pb-2">
+          {/* Stats */}
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <span>
+              Запланировано: <strong className="text-foreground font-mono">{totalScheduled}</strong>
+            </span>
+            <span>
+              Выполнено: <strong className="text-success font-mono">{totalCompleted}</strong>
+            </span>
+            <span>
+              Конверсия:{" "}
+              <strong
+                className={`font-mono ${
+                  conversionRate >= 70
+                    ? "text-success"
+                    : conversionRate >= 40
+                    ? "text-warning"
+                    : "text-destructive"
+                }`}
+              >
+                {conversionRate}%
+              </strong>
+            </span>
+          </div>
+
+          {/* Today button */}
+          {todayDay && (
+            <button
+              onClick={() => setShowToday(!showToday)}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                showToday
+                  ? "bg-accent text-white border-accent"
+                  : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+              }`}
+            >
+              <Icon name="Sun" size={12} />
+              Сегодня
+              {todayTasks.length > 0 && (
+                <span
+                  className={`text-[10px] font-mono ml-0.5 ${
+                    showToday ? "text-white/80" : "text-accent"
+                  }`}
+                >
+                  {todayTasks.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
+      {/* Today panel */}
+      {showToday && todayDay && (
+        <div className="mx-6 mt-3 border border-accent/20 rounded-lg bg-accent/3 overflow-hidden animate-fade-in flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-accent/15">
+            <Icon name="CalendarDays" size={13} className="text-accent" />
+            <p className="text-xs font-semibold text-foreground">
+              Задачи на сегодня — {todayDay}{" "}
+              {new Date(
+                parseInt(currentMonth.split("-")[0]),
+                parseInt(currentMonth.split("-")[1]) - 1,
+                todayDay
+              ).toLocaleDateString("ru-RU", { month: "long" })}
+            </p>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {todayTasks.filter((t) => t.completedDates.includes(todayDay)).length} из{" "}
+              {todayTasks.length} выполнено
+            </span>
+          </div>
+          {todayTasks.length === 0 ? (
+            <p className="px-4 py-3 text-xs text-muted-foreground">Нет задач на сегодня</p>
+          ) : (
+            <div className="divide-y divide-accent/10">
+              {todayTasks.map((t) => {
+                const isDone = t.completedDates.includes(todayDay);
+                const cat = getCategory(t.categoryId);
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/5 transition-colors"
+                  >
+                    <button
+                      onClick={() => toggleDate(t.id, todayDay)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                        isDone
+                          ? "bg-success border-success text-white"
+                          : "border-border hover:border-success"
+                      }`}
+                    >
+                      {isDone && <Icon name="Check" size={10} />}
+                    </button>
+                    <span
+                      className={`text-xs flex-1 ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}
+                    >
+                      {t.title}
+                    </span>
+                    {cat && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full badge-${cat.color}`}>
+                        {cat.name}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">
+                      {getBranchName(t.branchId)}
+                    </span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        t.type === "permanent"
+                          ? "bg-muted text-muted-foreground"
+                          : "bg-accent/10 text-accent"
+                      }`}
+                    >
+                      {t.type === "permanent" ? "Пост." : "Перем."}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-0">
+      <div className="flex-1 overflow-auto px-6 pb-6 pt-3">
         <div className="border border-border rounded-lg overflow-hidden bg-card">
           <div className="overflow-x-auto">
-            <table className="border-collapse" style={{ minWidth: TASK_COL_WIDTH + days.length * DATE_COL_WIDTH + 60 }}>
+            <table
+              className="border-collapse"
+              style={{
+                minWidth: TASK_COL_WIDTH + days.length * DATE_COL_WIDTH + 60,
+              }}
+            >
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th
@@ -193,10 +314,24 @@ export default function PlannerPage({
                       style={{ width: DATE_COL_WIDTH, minWidth: DATE_COL_WIDTH }}
                     >
                       <div className="flex flex-col items-center py-1.5 gap-0.5">
-                        <span className={`text-[10px] font-normal ${isWeekend(day, currentMonth) ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                        <span
+                          className={`text-[10px] font-normal ${
+                            isWeekend(day, currentMonth)
+                              ? "text-muted-foreground/60"
+                              : "text-muted-foreground"
+                          }`}
+                        >
                           {getWeekdayName(day, currentMonth)}
                         </span>
-                        <span className={`text-xs font-mono font-medium leading-none ${todayDay === day ? "text-accent" : isWeekend(day, currentMonth) ? "text-muted-foreground" : "text-foreground"}`}>
+                        <span
+                          className={`text-xs font-mono font-medium leading-none ${
+                            todayDay === day
+                              ? "text-accent"
+                              : isWeekend(day, currentMonth)
+                              ? "text-muted-foreground"
+                              : "text-foreground"
+                          }`}
+                        >
                           {day}
                         </span>
                       </div>
@@ -206,7 +341,7 @@ export default function PlannerPage({
               </thead>
 
               <tbody>
-                {/* Permanent tasks section */}
+                {/* Permanent tasks */}
                 <tr className="bg-muted/20">
                   <td
                     colSpan={days.length + 2}
@@ -222,7 +357,7 @@ export default function PlannerPage({
                     days={days}
                     currentMonth={currentMonth}
                     category={getCategory(task.categoryId)}
-                    canEdit={currentUser.role === "director"}
+                    canEdit={true}
                     editingTaskId={editingTaskId}
                     editingTitle={editingTitle}
                     onEditingTitleChange={setEditingTitle}
@@ -236,13 +371,16 @@ export default function PlannerPage({
                 ))}
                 {permanentTasks.length === 0 && (
                   <tr>
-                    <td colSpan={days.length + 2} className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border">
-                      Постоянные задачи назначает директор
+                    <td
+                      colSpan={days.length + 2}
+                      className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border"
+                    >
+                      Нет постоянных задач — добавьте ниже
                     </td>
                   </tr>
                 )}
 
-                {/* Variable tasks section */}
+                {/* Variable tasks */}
                 <tr className="bg-muted/20">
                   <td
                     colSpan={days.length + 2}
@@ -258,7 +396,7 @@ export default function PlannerPage({
                     days={days}
                     currentMonth={currentMonth}
                     category={getCategory(task.categoryId)}
-                    canEdit
+                    canEdit={true}
                     editingTaskId={editingTaskId}
                     editingTitle={editingTitle}
                     onEditingTitleChange={setEditingTitle}
@@ -272,7 +410,10 @@ export default function PlannerPage({
                 ))}
                 {variableTasks.length === 0 && (
                   <tr>
-                    <td colSpan={days.length + 2} className="px-4 py-4 text-xs text-muted-foreground italic">
+                    <td
+                      colSpan={days.length + 2}
+                      className="px-4 py-4 text-xs text-muted-foreground italic"
+                    >
                       Нет переменных задач
                     </td>
                   </tr>
@@ -280,8 +421,11 @@ export default function PlannerPage({
 
                 {/* Add task row */}
                 {addingTask ? (
-                  <tr className="border-t border-border bg-accent/3">
-                    <td className="px-4 py-2 sticky left-0 bg-background z-10" style={{ width: TASK_COL_WIDTH }}>
+                  <tr className="border-t border-border">
+                    <td
+                      className="px-4 py-2 sticky left-0 bg-background z-10"
+                      style={{ width: TASK_COL_WIDTH }}
+                    >
                       <div className="flex items-center gap-2">
                         <input
                           autoFocus
@@ -293,16 +437,21 @@ export default function PlannerPage({
                         />
                         <select
                           value={newTaskType}
-                          onChange={(e) => setNewTaskType(e.target.value as "permanent" | "variable")}
+                          onChange={(e) =>
+                            setNewTaskType(e.target.value as "permanent" | "variable")
+                          }
                           className="text-xs border border-border rounded px-1.5 py-1.5 outline-none bg-background"
                         >
                           <option value="variable">Переменная</option>
-                          {currentUser.role === "director" && <option value="permanent">Постоянная</option>}
+                          <option value="permanent">Постоянная</option>
                         </select>
                         <button onClick={addTask} className="text-success hover:opacity-80">
                           <Icon name="Check" size={14} />
                         </button>
-                        <button onClick={() => setAddingTask(false)} className="text-muted-foreground hover:text-destructive">
+                        <button
+                          onClick={() => setAddingTask(false)}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
                           <Icon name="X" size={14} />
                         </button>
                       </div>
@@ -331,21 +480,23 @@ export default function PlannerPage({
         <div className="flex items-center gap-5 mt-3 text-xs text-muted-foreground">
           <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-sm cell-planned" />
-            <span>Запланировано (нажмите ячейку)</span>
+            <span>Запланировано (1 клик)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-sm cell-done" />
-            <span>Выполнено (нажмите ещё раз)</span>
+            <span>Выполнено (2 клика)</span>
           </div>
           <div className="flex items-center gap-1.5">
             <div className="w-3.5 h-3.5 rounded-sm bg-muted border border-border" />
-            <span>Нажмите ещё раз чтобы снять</span>
+            <span>Снять отметку (3 клика)</span>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
+// ─── TaskRow ────────────────────────────────────────────────────────────────
 
 interface TaskRowProps {
   task: Task;
@@ -386,7 +537,7 @@ function TaskRow({
     <tr className="border-b border-border hover:bg-muted/10 group transition-colors">
       {/* Task name */}
       <td
-        className="px-4 py-2 sticky left-0 bg-card z-10 border-r border-border"
+        className="px-4 py-2 sticky left-0 bg-card z-10 border-r border-border group-hover:bg-muted/5"
         style={{ minWidth: 220, maxWidth: 220 }}
       >
         {isEditing ? (
@@ -406,10 +557,16 @@ function TaskRow({
             <span className="text-xs text-foreground truncate flex-1">{task.title}</span>
             {canEdit && (
               <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
-                <button onClick={() => onStartEdit(task)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => onStartEdit(task)}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <Icon name="Pencil" size={11} />
                 </button>
-                <button onClick={() => onDelete(task.id)} className="text-muted-foreground hover:text-destructive">
+                <button
+                  onClick={() => onDelete(task.id)}
+                  className="text-muted-foreground hover:text-destructive"
+                >
                   <Icon name="Trash2" size={11} />
                 </button>
               </div>
@@ -421,7 +578,9 @@ function TaskRow({
       {/* Category */}
       <td className="text-center px-1 border-r border-border">
         {category && (
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full badge-${category.color}`}>
+          <span
+            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full badge-${category.color}`}
+          >
             {category.name.slice(0, 3)}
           </span>
         )}
@@ -434,6 +593,13 @@ function TaskRow({
           <td
             key={day}
             onClick={() => onToggleDate(task.id, day)}
+            title={
+              state === "done"
+                ? "Выполнено — клик снимет"
+                : state === "planned"
+                ? "Запланировано — клик отметит выполненным"
+                : "Клик запланирует"
+            }
             className={`border-r border-border last:border-r-0 cursor-pointer transition-colors text-center
               ${isWeekend(day, currentMonth) ? "bg-muted/30" : ""}
               ${todayDay === day ? "bg-accent/5" : ""}
@@ -441,9 +607,7 @@ function TaskRow({
             `}
             style={{ width: 32, height: 36 }}
           >
-            {state === "done" && (
-              <span className="text-[10px] font-mono">✓</span>
-            )}
+            {state === "done" && <span className="text-[10px] font-mono">✓</span>}
             {state === "planned" && (
               <span className="text-[10px] font-mono opacity-60">·</span>
             )}

@@ -14,8 +14,14 @@ export default function ProfilePage({ currentUser, branches, employees, onUserCh
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: currentUser.name, email: currentUser.email });
 
+  function startEdit() {
+    setForm({ name: currentUser.name, email: currentUser.email });
+    setEditing(true);
+  }
+
   function save() {
-    onUserChange({ ...currentUser, name: form.name, email: form.email });
+    if (!form.name.trim()) return;
+    onUserChange({ ...currentUser, name: form.name.trim(), email: form.email.trim() });
     setEditing(false);
   }
 
@@ -52,7 +58,7 @@ export default function ProfilePage({ currentUser, branches, employees, onUserCh
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <h2 className="text-lg font-semibold text-foreground">{currentUser.name}</h2>
-                <button onClick={() => setEditing(true)} className="text-muted-foreground hover:text-foreground">
+                <button onClick={startEdit} className="text-muted-foreground hover:text-foreground">
                   <Icon name="Pencil" size={13} />
                 </button>
               </div>

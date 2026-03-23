@@ -17,6 +17,7 @@ interface Props {
   groupGoals: GroupGoal[];
   groupTasks: GroupTask[];
   tasks: Task[];
+  onGroupGoalsChange: (goals: GroupGoal[]) => void;
   onGroupTasksChange: (gt: GroupTask[]) => void;
   onTasksChange: (tasks: Task[]) => void;
   currentMonth: string;
@@ -30,6 +31,7 @@ export default function TeamPage({
   groupGoals,
   groupTasks,
   tasks,
+  onGroupGoalsChange,
   onGroupTasksChange,
   onTasksChange,
   currentMonth,
@@ -37,6 +39,7 @@ export default function TeamPage({
   const [activeBranchId, setActiveBranchId] = useState(branches[0]?.id || "");
   const [addingGoal, setAddingGoal] = useState(false);
   const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [newGoalAllBranches, setNewGoalAllBranches] = useState(false);
   const [addingTaskForGoal, setAddingTaskForGoal] = useState<string | null>(null);
   const [newTask, setNewTask] = useState({
     title: "",
@@ -44,10 +47,17 @@ export default function TeamPage({
     categoryId: "",
     assignedEmployeeId: "",
   });
-  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set(groupGoals.map((g) => g.id)));
+  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(
+    new Set(groupGoals.map((g) => g.id))
+  );
 
-  const branchGoals = groupGoals.filter((g) => g.branchId === activeBranchId);
-  const branchEmployees = employees.filter((e) => e.branchIds.includes(activeBranchId));
+  // Goals for the active branch OR "all" goals (branchId === "all")
+  const branchGoals = groupGoals.filter(
+    (g) => g.branchId === activeBranchId || g.branchId === "all"
+  );
+  const branchEmployees = employees.filter((e) =>
+    e.branchIds.includes(activeBranchId)
+  );
 
   function toggleGoal(goalId: string) {
     setExpandedGoals((prev) => {
@@ -63,11 +73,18 @@ export default function TeamPage({
     const newGoal: GroupGoal = {
       id: `gg_${Date.now()}`,
       title: newGoalTitle.trim(),
-      branchId: activeBranchId,
+      branchId: newGoalAllBranches ? "all" : activeBranchId,
     };
-    // We'd normally lift this state - for now just alert
+    onGroupGoalsChange([...groupGoals, newGoal]);
+    setExpandedGoals((prev) => new Set([...prev, newGoal.id]));
     setNewGoalTitle("");
+    setNewGoalAllBranches(false);
     setAddingGoal(false);
+  }
+
+  function deleteGoal(goalId: string) {
+    onGroupGoalsChange(groupGoals.filter((g) => g.id !== goalId));
+    onGroupTasksChange(groupTasks.filter((t) => t.goalId !== goalId));
   }
 
   function addGroupTask(goalId: string) {
@@ -75,6 +92,7 @@ export default function TeamPage({
 
     const deadline = new Date(newTask.deadline);
     const deadlineDay = deadline.getDate();
+    const monthYear = `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}`;
 
     const gt: GroupTask = {
       id: `gt_${Date.now()}`,
@@ -84,7 +102,7 @@ export default function TeamPage({
       deadline: newTask.deadline,
       categoryId: newTask.categoryId || categories[0]?.id || "",
       assignedEmployeeId: newTask.assignedEmployeeId,
-      monthYear: `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}`,
+      monthYear,
       completedByEmployee: false,
     };
 
@@ -95,7 +113,7 @@ export default function TeamPage({
       employeeId: newTask.assignedEmployeeId,
       branchId: activeBranchId,
       categoryId: newTask.categoryId,
-      monthYear: gt.monthYear,
+      monthYear,
       scheduledDates: [deadlineDay],
       completedDates: [],
       fromGroupTaskId: gt.id,
@@ -128,14 +146,14 @@ export default function TeamPage({
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Branch tabs */}
-      <div className="px-6 pt-5 pb-0 flex items-center gap-1 flex-shrink-0">
+      <div className="px-6 pt-5 pb-0 flex items-center gap-1 flex-shrink-0 border-b border-border">
         {branches.map((b) => (
           <button
             key={b.id}
             onClick={() => setActiveBranchId(b.id)}
-            className={`px-4 py-2 text-xs font-medium rounded-t-md transition-colors border-b-2 ${
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
               activeBranchId === b.id
-                ? "border-accent text-accent bg-accent/5"
+                ? "border-accent text-accent"
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -145,13 +163,14 @@ export default function TeamPage({
       </div>
 
       {/* Goals list */}
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-3">
+      <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
         <div className="space-y-3">
           {branchGoals.map((goal) => {
             const stats = getGoalStats(goal.id);
             const goalTasks = groupTasks.filter((t) => t.goalId === goal.id);
             const isExpanded = expandedGoals.has(goal.id);
             const progress = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+            const isAllBranches = goal.branchId === "all";
 
             return (
               <div key={goal.id} className="border border-border rounded-lg overflow-hidden bg-card">
@@ -160,17 +179,29 @@ export default function TeamPage({
                   className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20 transition-colors"
                   onClick={() => toggleGoal(goal.id)}
                 >
-                  <Icon name={isExpanded ? "ChevronDown" : "ChevronRight"} size={14} className="text-muted-foreground flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
+                  <Icon
+                    name={isExpanded ? "ChevronDown" : "ChevronRight"}
+                    size={14}
+                    className="text-muted-foreground flex-shrink-0"
+                  />
+                  <div className="flex-1 min-w-0 flex items-center gap-2">
                     <p className="text-sm font-medium text-foreground">{goal.title}</p>
+                    {isAllBranches && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent/10 text-accent flex-shrink-0">
+                        Все филиалы
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-3 flex-shrink-0">
-                    {/* Progress */}
                     <div className="flex items-center gap-2">
                       <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
                         <div
                           className={`h-full rounded-full transition-all ${
-                            progress >= 80 ? "bg-success" : progress >= 40 ? "bg-warning" : "bg-accent"
+                            progress >= 80
+                              ? "bg-success"
+                              : progress >= 40
+                              ? "bg-warning"
+                              : "bg-accent"
                           }`}
                           style={{ width: `${progress}%` }}
                         />
@@ -183,12 +214,26 @@ export default function TeamPage({
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setAddingTaskForGoal(addingTaskForGoal === goal.id ? null : goal.id);
+                          setAddingTaskForGoal(
+                            addingTaskForGoal === goal.id ? null : goal.id
+                          );
+                          setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "" });
                         }}
                         className="flex items-center gap-1 text-xs text-accent hover:opacity-80 px-2 py-1 rounded border border-accent/30 hover:bg-accent/5 transition-colors"
                       >
                         <Icon name="Plus" size={12} />
                         Задача
+                      </button>
+                    )}
+                    {isDirector && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteGoal(goal.id);
+                        }}
+                        className="text-muted-foreground hover:text-destructive transition-colors"
+                      >
+                        <Icon name="Trash2" size={13} />
                       </button>
                     )}
                   </div>
@@ -200,11 +245,21 @@ export default function TeamPage({
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-border bg-muted/30">
-                          <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">Задача</th>
-                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-28">Дедлайн</th>
-                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-24">Категория</th>
-                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-36">Ответственный</th>
-                          <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-24">Статус</th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">
+                            Задача
+                          </th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-28">
+                            Дедлайн
+                          </th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-24">
+                            Категория
+                          </th>
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-36">
+                            Ответственный
+                          </th>
+                          <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-24">
+                            Статус
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
@@ -212,21 +267,34 @@ export default function TeamPage({
                           const emp = getEmployee(gt.assignedEmployeeId);
                           const cat = getCategory(gt.categoryId);
                           const deadlineDate = new Date(gt.deadline);
-                          const isOverdue = !gt.completedByEmployee && deadlineDate < new Date();
+                          const isOverdue =
+                            !gt.completedByEmployee && deadlineDate < new Date();
                           return (
-                            <tr key={gt.id} className="border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors">
+                            <tr
+                              key={gt.id}
+                              className="border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors"
+                            >
                               <td className="px-4 py-2.5">
                                 <span className="text-xs text-foreground">{gt.title}</span>
                               </td>
                               <td className="px-3 py-2.5">
-                                <span className={`text-xs font-mono ${isOverdue ? "text-destructive" : "text-muted-foreground"}`}>
-                                  {deadlineDate.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}
+                                <span
+                                  className={`text-xs font-mono ${
+                                    isOverdue ? "text-destructive" : "text-muted-foreground"
+                                  }`}
+                                >
+                                  {deadlineDate.toLocaleDateString("ru-RU", {
+                                    day: "numeric",
+                                    month: "short",
+                                  })}
                                   {isOverdue && " ⚠"}
                                 </span>
                               </td>
                               <td className="px-3 py-2.5">
                                 {cat && (
-                                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full badge-${cat.color}`}>
+                                  <span
+                                    className={`text-[10px] font-medium px-2 py-0.5 rounded-full badge-${cat.color}`}
+                                  >
                                     {cat.name}
                                   </span>
                                 )}
@@ -234,9 +302,15 @@ export default function TeamPage({
                               <td className="px-3 py-2.5">
                                 <div className="flex items-center gap-1.5">
                                   <div className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-foreground">
-                                    {emp?.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                                    {emp?.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")
+                                      .slice(0, 2)}
                                   </div>
-                                  <span className="text-xs text-foreground">{emp?.name.split(" ")[0]}</span>
+                                  <span className="text-xs text-foreground">
+                                    {emp?.name.split(" ")[0]}
+                                  </span>
                                 </div>
                               </td>
                               <td className="px-3 py-2.5 text-center">
@@ -255,8 +329,11 @@ export default function TeamPage({
                         })}
                         {goalTasks.length === 0 && (
                           <tr>
-                            <td colSpan={5} className="px-4 py-4 text-xs text-muted-foreground text-center">
-                              Нет задач — добавьте первую
+                            <td
+                              colSpan={5}
+                              className="px-4 py-5 text-xs text-muted-foreground text-center"
+                            >
+                              Нет задач — нажмите «+ Задача» чтобы добавить
                             </td>
                           </tr>
                         )}
@@ -265,42 +342,55 @@ export default function TeamPage({
 
                     {/* Add task form */}
                     {addingTaskForGoal === goal.id && (
-                      <div className="border-t border-border bg-muted/10 px-4 py-3">
+                      <div className="border-t border-border bg-muted/10 px-4 py-3 animate-fade-in">
                         <p className="text-xs font-medium text-foreground mb-3">Новая задача</p>
                         <div className="grid grid-cols-2 gap-2 mb-2">
                           <input
                             autoFocus
                             value={newTask.title}
-                            onChange={(e) => setNewTask((p) => ({ ...p, title: e.target.value }))}
+                            onChange={(e) =>
+                              setNewTask((p) => ({ ...p, title: e.target.value }))
+                            }
                             placeholder="Название задачи"
                             className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background col-span-2"
                           />
-                          <div className="flex gap-2">
-                            <input
-                              type="date"
-                              value={newTask.deadline}
-                              onChange={(e) => setNewTask((p) => ({ ...p, deadline: e.target.value }))}
-                              className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background flex-1"
-                            />
-                            <select
-                              value={newTask.categoryId}
-                              onChange={(e) => setNewTask((p) => ({ ...p, categoryId: e.target.value }))}
-                              className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background flex-1"
-                            >
-                              <option value="">Категория</option>
-                              {categories.map((c) => (
-                                <option key={c.id} value={c.id}>{c.name}</option>
-                              ))}
-                            </select>
-                          </div>
+                          <input
+                            type="date"
+                            value={newTask.deadline}
+                            onChange={(e) =>
+                              setNewTask((p) => ({ ...p, deadline: e.target.value }))
+                            }
+                            className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
+                          />
                           <select
-                            value={newTask.assignedEmployeeId}
-                            onChange={(e) => setNewTask((p) => ({ ...p, assignedEmployeeId: e.target.value }))}
+                            value={newTask.categoryId}
+                            onChange={(e) =>
+                              setNewTask((p) => ({ ...p, categoryId: e.target.value }))
+                            }
                             className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background"
                           >
-                            <option value="">Ответственный</option>
+                            <option value="">Категория</option>
+                            {categories.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                          <select
+                            value={newTask.assignedEmployeeId}
+                            onChange={(e) =>
+                              setNewTask((p) => ({
+                                ...p,
+                                assignedEmployeeId: e.target.value,
+                              }))
+                            }
+                            className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background col-span-2"
+                          >
+                            <option value="">Выбрать ответственного</option>
                             {branchEmployees.map((e) => (
-                              <option key={e.id} value={e.id}>{e.name}</option>
+                              <option key={e.id} value={e.id}>
+                                {e.name} — {e.roleLabel}
+                              </option>
                             ))}
                           </select>
                         </div>
@@ -327,42 +417,67 @@ export default function TeamPage({
           })}
 
           {/* Add goal */}
-          {isDirector && (
-            addingGoal ? (
-              <div className="border border-border rounded-lg px-4 py-3 bg-card">
-                <div className="flex items-center gap-2">
+          {isDirector &&
+            (addingGoal ? (
+              <div className="border border-accent/30 rounded-lg px-4 py-3 bg-card animate-fade-in">
+                <p className="text-xs font-medium text-foreground mb-2">Новая цель</p>
+                <input
+                  autoFocus
+                  value={newGoalTitle}
+                  onChange={(e) => setNewGoalTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addGoal()}
+                  placeholder="Название цели..."
+                  className="w-full text-sm border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background mb-2"
+                />
+                <label className="flex items-center gap-2 mb-3 cursor-pointer">
                   <input
-                    autoFocus
-                    value={newGoalTitle}
-                    onChange={(e) => setNewGoalTitle(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && addGoal()}
-                    placeholder="Название цели..."
-                    className="flex-1 text-sm border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
+                    type="checkbox"
+                    checked={newGoalAllBranches}
+                    onChange={(e) => setNewGoalAllBranches(e.target.checked)}
+                    className="rounded border-border"
                   />
-                  <button onClick={addGoal} className="text-success hover:opacity-80 p-1">
-                    <Icon name="Check" size={16} />
+                  <span className="text-xs text-muted-foreground">
+                    Создать для всех филиалов
+                  </span>
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={addGoal}
+                    className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:opacity-90 font-medium"
+                  >
+                    Создать
                   </button>
-                  <button onClick={() => setAddingGoal(false)} className="text-muted-foreground hover:text-destructive p-1">
-                    <Icon name="X" size={16} />
+                  <button
+                    onClick={() => {
+                      setAddingGoal(false);
+                      setNewGoalTitle("");
+                      setNewGoalAllBranches(false);
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded border border-border"
+                  >
+                    Отмена
                   </button>
                 </div>
               </div>
             ) : (
               <button
                 onClick={() => setAddingGoal(true)}
-                className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:text-accent hover:border-accent transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-3.5 border border-dashed border-border rounded-lg text-xs text-muted-foreground hover:text-accent hover:border-accent transition-colors"
               >
                 <Icon name="Plus" size={14} />
                 Добавить цель
               </button>
-            )
-          )}
+            ))}
 
           {branchGoals.length === 0 && !addingGoal && (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Icon name="Target" size={32} className="text-muted-foreground/30 mb-3" />
               <p className="text-sm text-muted-foreground">Нет целей для этого филиала</p>
-              {isDirector && <p className="text-xs text-muted-foreground/60 mt-1">Нажмите «Добавить цель» чтобы начать</p>}
+              {isDirector && (
+                <p className="text-xs text-muted-foreground/60 mt-1">
+                  Нажмите «Добавить цель» чтобы начать
+                </p>
+              )}
             </div>
           )}
         </div>

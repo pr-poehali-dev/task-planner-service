@@ -24,12 +24,12 @@ export default function Index() {
   const [activePage, setActivePage] = useState("planner");
   const [currentMonth, setCurrentMonth] = useState("2026-03");
 
-  const [currentUser] = useState<Employee>(MOCK_EMPLOYEES[0]);
+  const [currentUser, setCurrentUser] = useState<Employee>(MOCK_EMPLOYEES[0]);
   const [branches, setBranches] = useState<Branch[]>(MOCK_BRANCHES);
   const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
   const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [groupGoals] = useState<GroupGoal[]>(MOCK_GROUP_GOALS);
+  const [groupGoals, setGroupGoals] = useState<GroupGoal[]>(MOCK_GROUP_GOALS);
   const [groupTasks, setGroupTasks] = useState<GroupTask[]>(MOCK_GROUP_TASKS);
 
   return (
@@ -60,6 +60,7 @@ export default function Index() {
           groupGoals={groupGoals}
           groupTasks={groupTasks}
           tasks={tasks}
+          onGroupGoalsChange={setGroupGoals}
           onGroupTasksChange={setGroupTasks}
           onTasksChange={setTasks}
           currentMonth={currentMonth}
@@ -90,7 +91,12 @@ export default function Index() {
           currentUser={currentUser}
           branches={branches}
           employees={employees}
-          onUserChange={() => {}}
+          onUserChange={(updated) => {
+            setCurrentUser(updated);
+            setEmployees((prev) =>
+              prev.map((e) => (e.id === updated.id ? updated : e))
+            );
+          }}
           onNavigate={setActivePage}
         />
       )}
