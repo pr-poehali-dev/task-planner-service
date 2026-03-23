@@ -125,8 +125,9 @@
     color: hsl(142 70% 30%);
   }
   .cell-planned {
-    background-color: hsl(210 100% 52% / 0.1);
-    color: hsl(210 100% 40%);
+    background-color: hsl(210 100% 52% / 0.22);
+    color: hsl(210 100% 35%);
+    box-shadow: inset 0 0 0 1.5px hsl(210 100% 52% / 0.45);
   }
   .cell-hover:hover {
     background-color: hsl(220 10% 95%);

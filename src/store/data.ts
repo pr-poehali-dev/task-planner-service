@@ -32,6 +32,7 @@ export interface Task {
   employeeId: string;
   branchId: string;
   categoryId?: string;
+  assigneeId?: string;
   monthYear: string; // "2026-03"
   scheduledDates: number[];
   completedDates: number[];
