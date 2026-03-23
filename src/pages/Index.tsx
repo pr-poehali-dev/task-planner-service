@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Layout from "@/components/Layout";
 import LoginPage from "@/pages/LoginPage";
 import PlannerPage from "@/pages/PlannerPage";
@@ -21,23 +21,124 @@ import {
   type GroupGoal,
   type GroupTask,
 } from "@/store/data";
+import { loadFromStorage, saveToStorage } from "@/store/persist";
+
+function getInitialState() {
+  const saved = loadFromStorage();
+  if (saved) {
+    return {
+      branches: (saved.branches || MOCK_BRANCHES) as Branch[],
+      employees: (saved.employees || MOCK_EMPLOYEES) as Employee[],
+      categories: (saved.categories || MOCK_CATEGORIES) as Category[],
+      tasks: (saved.tasks || MOCK_TASKS) as Task[],
+      groupGoals: (saved.groupGoals || MOCK_GROUP_GOALS) as GroupGoal[],
+      groupTasks: (saved.groupTasks || MOCK_GROUP_TASKS) as GroupTask[],
+      passwords: saved.passwords || EMPLOYEE_PASSWORDS,
+      currentUserId: saved.currentUserId,
+    };
+  }
+  return {
+    branches: MOCK_BRANCHES,
+    employees: MOCK_EMPLOYEES,
+    categories: MOCK_CATEGORIES,
+    tasks: MOCK_TASKS,
+    groupGoals: MOCK_GROUP_GOALS,
+    groupTasks: MOCK_GROUP_TASKS,
+    passwords: EMPLOYEE_PASSWORDS,
+    currentUserId: null as string | null,
+  };
+}
 
 export default function Index() {
+  const initial = getInitialState();
+
   const [activePage, setActivePage] = useState("planner");
-  const [currentMonth, setCurrentMonth] = useState("2026-03");
-  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
-  const [passwords, setPasswords] = useState<Record<string, string>>(EMPLOYEE_PASSWORDS);
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  });
 
-  const [branches, setBranches] = useState<Branch[]>(MOCK_BRANCHES);
-  const [employees, setEmployees] = useState<Employee[]>(MOCK_EMPLOYEES);
-  const [categories, setCategories] = useState<Category[]>(MOCK_CATEGORIES);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
-  const [groupGoals, setGroupGoals] = useState<GroupGoal[]>(MOCK_GROUP_GOALS);
-  const [groupTasks, setGroupTasks] = useState<GroupTask[]>(MOCK_GROUP_TASKS);
+  const [branches, setBranches] = useState<Branch[]>(initial.branches);
+  const [employees, setEmployees] = useState<Employee[]>(initial.employees);
+  const [categories, setCategories] = useState<Category[]>(initial.categories);
+  const [tasks, setTasks] = useState<Task[]>(initial.tasks);
+  const [groupGoals, setGroupGoals] = useState<GroupGoal[]>(initial.groupGoals);
+  const [groupTasks, setGroupTasks] = useState<GroupTask[]>(initial.groupTasks);
+  const [passwords, setPasswords] = useState<Record<string, string>>(initial.passwords);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(
+    initial.currentUserId
+      ? initial.employees.find((e: Employee) => e.id === initial.currentUserId) || null
+      : null
+  );
+  const [notificationShown, setNotificationShown] = useState(false);
 
+  // ─── Persist ────────────────────────────────────────────────────────────
+  const persist = useCallback(() => {
+    saveToStorage({
+      branches,
+      employees,
+      categories,
+      tasks,
+      groupGoals,
+      groupTasks,
+      passwords,
+      currentUserId: currentUser?.id || null,
+    });
+  }, [branches, employees, categories, tasks, groupGoals, groupTasks, passwords, currentUser]);
+
+  useEffect(() => {
+    persist();
+  }, [persist]);
+
+  // ─── Notifications ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUser || notificationShown) return;
+
+    const now = new Date();
+    const todayMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const todayDay = now.getDate();
+
+    const todayTasks = tasks.filter(
+      (t) =>
+        t.employeeId === currentUser.id &&
+        t.monthYear === todayMonthYear &&
+        t.scheduledDates.includes(todayDay) &&
+        !t.completedDates.includes(todayDay)
+    );
+
+    if (todayTasks.length === 0) return;
+
+    setNotificationShown(true);
+
+    if ("Notification" in window) {
+      if (Notification.permission === "granted") {
+        showNotification(todayTasks.length);
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            showNotification(todayTasks.length);
+          }
+        });
+      }
+    }
+  }, [currentUser, tasks, notificationShown]);
+
+  function showNotification(count: number) {
+    try {
+      new Notification("Планер — задачи на сегодня", {
+        body: `У вас ${count} ${count === 1 ? "невыполненная задача" : count < 5 ? "невыполненные задачи" : "невыполненных задач"} на сегодня`,
+        icon: "/favicon.svg",
+      });
+    } catch {
+      // Notification not available
+    }
+  }
+
+  // ─── Handlers ──────────────────────────────────────────────────────────
   function handleLogin(emp: Employee) {
     setCurrentUser(emp);
     setActivePage("planner");
+    setNotificationShown(false);
   }
 
   function handleLogout() {
@@ -54,7 +155,11 @@ export default function Index() {
     setPasswords((prev) => ({ ...prev, [empId]: newPassword }));
   }
 
-  // ─── Экран входа ────────────────────────────────────────────────────────
+  function handleTasksChange(newTasks: Task[]) {
+    setTasks(newTasks);
+  }
+
+  // ─── Login ─────────────────────────────────────────────────────────────
   if (!currentUser) {
     return (
       <LoginPage
@@ -65,7 +170,7 @@ export default function Index() {
     );
   }
 
-  // ─── Фильтрация по роли ─────────────────────────────────────────────────
+  // ─── Filtering ─────────────────────────────────────────────────────────
   const isDirector = currentUser.role === "director";
   const userBranchIds = currentUser.branchIds;
 
@@ -81,8 +186,6 @@ export default function Index() {
     ? groupTasks
     : groupTasks.filter((gt) => userBranchIds.includes(gt.branchId));
 
-  const visibleEmployees = isDirector ? employees : employees;
-
   return (
     <Layout
       activePage={activePage}
@@ -96,10 +199,10 @@ export default function Index() {
         <PlannerPage
           currentUser={currentUser}
           branches={visibleBranches}
-          employees={visibleEmployees}
+          employees={employees}
           categories={categories}
           tasks={tasks}
-          onTasksChange={setTasks}
+          onTasksChange={handleTasksChange}
           currentMonth={currentMonth}
         />
       )}
@@ -107,14 +210,14 @@ export default function Index() {
         <TeamPage
           currentUser={currentUser}
           branches={isDirector ? branches : visibleBranches}
-          employees={visibleEmployees}
+          employees={employees}
           categories={categories}
           groupGoals={visibleGoals}
           groupTasks={visibleGroupTasks}
           tasks={tasks}
           onGroupGoalsChange={setGroupGoals}
           onGroupTasksChange={setGroupTasks}
-          onTasksChange={setTasks}
+          onTasksChange={handleTasksChange}
           currentMonth={currentMonth}
         />
       )}
@@ -125,10 +228,13 @@ export default function Index() {
           employees={employees}
           categories={categories}
           passwords={passwords}
+          tasks={tasks}
           onBranchesChange={setBranches}
           onEmployeesChange={setEmployees}
           onCategoriesChange={setCategories}
           onPasswordChange={handlePasswordChange}
+          onTasksChange={handleTasksChange}
+          currentMonth={currentMonth}
         />
       )}
       {activePage === "statistics" && (

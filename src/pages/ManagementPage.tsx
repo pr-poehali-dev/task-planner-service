@@ -4,6 +4,8 @@ import {
   type Employee,
   type Branch,
   type Category,
+  type Task,
+  getDaysInMonth,
 } from "@/store/data";
 
 interface Props {
@@ -12,13 +14,16 @@ interface Props {
   employees: Employee[];
   categories: Category[];
   passwords: Record<string, string>;
+  tasks: Task[];
   onBranchesChange: (b: Branch[]) => void;
   onEmployeesChange: (e: Employee[]) => void;
   onCategoriesChange: (c: Category[]) => void;
   onPasswordChange: (empId: string, password: string) => void;
+  onTasksChange: (t: Task[]) => void;
+  currentMonth: string;
 }
 
-type ManagementTab = "employees" | "branches" | "categories" | "roles";
+type ManagementTab = "employees" | "branches" | "categories" | "roles" | "assign";
 
 export default function ManagementPage({
   currentUser,
@@ -26,10 +31,13 @@ export default function ManagementPage({
   employees,
   categories,
   passwords,
+  tasks,
   onBranchesChange,
   onEmployeesChange,
   onCategoriesChange,
   onPasswordChange,
+  onTasksChange,
+  currentMonth,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ManagementTab>("employees");
   const isDirector = currentUser.role === "director";
@@ -38,7 +46,12 @@ export default function ManagementPage({
     { id: "employees", label: "Сотрудники", icon: "Users" },
     { id: "branches", label: "Филиалы", icon: "MapPin" },
     { id: "categories", label: "Категории", icon: "Tag" },
-    ...(isDirector ? [{ id: "roles" as ManagementTab, label: "Роли и доступ", icon: "Shield" }] : []),
+    ...(isDirector
+      ? [
+          { id: "assign" as ManagementTab, label: "Назначить задачи", icon: "ClipboardList" },
+          { id: "roles" as ManagementTab, label: "Роли и доступ", icon: "Shield" },
+        ]
+      : []),
   ];
 
   return (
@@ -84,6 +97,16 @@ export default function ManagementPage({
             categories={categories}
             onCategoriesChange={onCategoriesChange}
             isDirector={isDirector}
+          />
+        )}
+        {activeTab === "assign" && isDirector && (
+          <AssignTasksTab
+            employees={employees}
+            branches={branches}
+            categories={categories}
+            tasks={tasks}
+            onTasksChange={onTasksChange}
+            currentMonth={currentMonth}
           />
         )}
         {activeTab === "roles" && isDirector && (
@@ -593,6 +616,189 @@ function RolesTab({
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Assign Tasks (Director) ────────────────────────────────────────────────
+
+function AssignTasksTab({
+  employees,
+  branches,
+  categories,
+  tasks,
+  onTasksChange,
+  currentMonth,
+}: {
+  employees: Employee[];
+  branches: Branch[];
+  categories: Category[];
+  tasks: Task[];
+  onTasksChange: (t: Task[]) => void;
+  currentMonth: string;
+}) {
+  const nonDirectors = employees.filter((e) => e.role !== "director");
+  const [selectedEmpId, setSelectedEmpId] = useState(nonDirectors[0]?.id || "");
+  const [selectedBranchId, setSelectedBranchId] = useState("");
+  const [adding, setAdding] = useState(false);
+  const [form, setForm] = useState({ title: "", categoryId: "" });
+
+  const selectedEmp = employees.find((e) => e.id === selectedEmpId);
+  const empBranches = selectedEmp
+    ? branches.filter((b) => selectedEmp.branchIds.includes(b.id))
+    : [];
+
+  const activeBranchId = selectedBranchId || empBranches[0]?.id || "";
+
+  const empTasks = tasks.filter(
+    (t) =>
+      t.employeeId === selectedEmpId &&
+      t.branchId === activeBranchId &&
+      t.monthYear === currentMonth &&
+      t.type === "permanent"
+  );
+
+  function addPermanentTask() {
+    if (!form.title.trim() || !activeBranchId) return;
+    const newTask: Task = {
+      id: `t_${Date.now()}`,
+      title: form.title.trim(),
+      type: "permanent",
+      employeeId: selectedEmpId,
+      branchId: activeBranchId,
+      categoryId: form.categoryId || undefined,
+      monthYear: currentMonth,
+      scheduledDates: [],
+      completedDates: [],
+    };
+    onTasksChange([...tasks, newTask]);
+    setForm({ title: "", categoryId: "" });
+    setAdding(false);
+  }
+
+  function deleteTask(taskId: string) {
+    onTasksChange(tasks.filter((t) => t.id !== taskId));
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-sm font-semibold text-foreground mb-1">
+          Назначить постоянные задачи сотрудникам
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Выберите сотрудника и филиал — задачи появятся в его личном планере
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-foreground mb-1.5">Сотрудник</label>
+          <select
+            value={selectedEmpId}
+            onChange={(e) => {
+              setSelectedEmpId(e.target.value);
+              setSelectedBranchId("");
+            }}
+            className="w-full text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-accent bg-background"
+          >
+            {nonDirectors.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name} — {e.roleLabel}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-xs font-medium text-foreground mb-1.5">Филиал</label>
+          <select
+            value={activeBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            className="w-full text-xs border border-border rounded-lg px-3 py-2 outline-none focus:border-accent bg-background"
+          >
+            {empBranches.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.name} ({b.city})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="border border-border rounded-lg overflow-hidden bg-card">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-muted/30 border-b border-border">
+          <p className="text-xs font-medium text-muted-foreground">
+            Постоянные задачи ({empTasks.length})
+          </p>
+          <button
+            onClick={() => setAdding(true)}
+            className="flex items-center gap-1 text-xs text-accent hover:opacity-80 font-medium"
+          >
+            <Icon name="Plus" size={12} />
+            Добавить
+          </button>
+        </div>
+
+        {adding && (
+          <div className="px-4 py-3 border-b border-border bg-accent/3 animate-fade-in">
+            <div className="flex flex-col sm:flex-row gap-2 mb-2">
+              <input
+                autoFocus
+                value={form.title}
+                onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                onKeyDown={(e) => e.key === "Enter" && addPermanentTask()}
+                placeholder="Название задачи"
+                className="flex-1 text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
+              />
+              <select
+                value={form.categoryId}
+                onChange={(e) => setForm((p) => ({ ...p, categoryId: e.target.value }))}
+                className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background"
+              >
+                <option value="">Категория</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={addPermanentTask} className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:opacity-90 font-medium">
+                Назначить
+              </button>
+              <button onClick={() => setAdding(false)} className="text-xs text-muted-foreground px-3 py-1.5 rounded border border-border">
+                Отмена
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="divide-y divide-border">
+          {empTasks.map((t) => {
+            const cat = categories.find((c) => c.id === t.categoryId);
+            return (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-muted/10 group transition-colors">
+                <span className="text-xs text-foreground flex-1">{t.title}</span>
+                {cat && (
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full badge-${cat.color}`}>
+                    {cat.name}
+                  </span>
+                )}
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {t.scheduledDates.length} дн.
+                </span>
+                <button onClick={() => deleteTask(t.id)} className="hidden group-hover:block text-muted-foreground hover:text-destructive">
+                  <Icon name="Trash2" size={12} />
+                </button>
+              </div>
+            );
+          })}
+          {empTasks.length === 0 && !adding && (
+            <p className="px-4 py-5 text-xs text-muted-foreground text-center">
+              Нет постоянных задач — нажмите «Добавить»
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
