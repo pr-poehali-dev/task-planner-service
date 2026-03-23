@@ -22,7 +22,7 @@ export interface Category {
   color: "high" | "medium" | "low";
 }
 
-export type TaskType = "permanent" | "variable";
+export type TaskType = "permanent" | "variable" | "unplanned";
 export type TaskStatus = "pending" | "done" | "in-progress";
 
 export interface Task {
@@ -40,6 +40,9 @@ export interface Task {
   repeatDays?: number[]; // 0=Sun,1=Mon,...
   fromGroupTaskId?: string;
   deadline?: number;
+  rescheduledCount?: number;
+  createdByEmployeeId?: string;
+  goalTitle?: string;
 }
 
 export interface GroupGoal {
@@ -53,11 +56,13 @@ export interface GroupTask {
   goalId: string;
   title: string;
   branchId: string;
-  deadline: string; // ISO date "2026-03-20"
+  deadline?: string; // ISO date "2026-03-20"
   categoryId: string;
   assignedEmployeeId: string;
   monthYear: string;
   completedByEmployee?: boolean;
+  status?: "in-progress" | "completed" | "rescheduled" | "overdue";
+  createdByEmployeeId?: string;
 }
 
 export interface AppState {

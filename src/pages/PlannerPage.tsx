@@ -5,6 +5,7 @@ import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import {
   type Task,
+  type TaskType,
   type Employee,
   type Branch,
   type Category,
@@ -39,11 +40,12 @@ export default function PlannerPage({
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  const [newTaskType, setNewTaskType] = useState<"permanent" | "variable">("variable");
+  const [newTaskType, setNewTaskType] = useState<TaskType>("variable");
   const [newTaskAssignee, setNewTaskAssignee] = useState("");
   const [addingTask, setAddingTask] = useState(false);
   const [showToday, setShowToday] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [filterAssignee, setFilterAssignee] = useState<string>("");
 
   const days = getDaysInMonth(currentMonth);
 
@@ -54,14 +56,20 @@ export default function PlannerPage({
       ? today.getDate()
       : null;
 
-  const branchTasks = tasks.filter(
+  const allBranchTasks = tasks.filter(
     (t) =>
       t.employeeId === currentUser.id &&
       t.branchId === activeBranchId &&
       t.monthYear === currentMonth
   );
+
+  const branchTasks = filterAssignee
+    ? allBranchTasks.filter((t) => t.assigneeId === filterAssignee)
+    : allBranchTasks;
+
   const permanentTasks = branchTasks.filter((t) => t.type === "permanent");
   const variableTasks = branchTasks.filter((t) => t.type === "variable");
+  const unplannedTasks = branchTasks.filter((t) => t.type === "unplanned");
 
   const todayTasks = todayDay
     ? tasks.filter(
@@ -75,6 +83,21 @@ export default function PlannerPage({
   const branchEmployees = employees.filter((e) =>
     e.branchIds.includes(activeBranchId) && e.id !== currentUser.id
   );
+
+  // Stats
+  const totalScheduled = branchTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
+  const totalCompleted = branchTasks.reduce((acc, t) => acc + t.completedDates.length, 0);
+  const conversionRate = totalScheduled > 0 ? Math.round((totalCompleted / totalScheduled) * 100) : 0;
+  const totalRescheduled = branchTasks.reduce((acc, t) => acc + (t.rescheduledCount || 0), 0);
+
+  // Count overdue: scheduled dates in the past that are not completed
+  const overdueCount = todayDay
+    ? branchTasks.reduce((acc, t) => {
+        return acc + t.scheduledDates.filter(
+          (d) => d < todayDay && !t.completedDates.includes(d)
+        ).length;
+      }, 0)
+    : 0;
 
   function getEmployeeName(id?: string) {
     if (!id) return "";
@@ -94,10 +117,12 @@ export default function PlannerPage({
           return { ...t, completedDates: [...t.completedDates, day].sort((a, b) => a - b) };
         }
         if (isCompleted) {
+          // Third click: removing the date - track as reschedule
           return {
             ...t,
             scheduledDates: t.scheduledDates.filter((d) => d !== day),
             completedDates: t.completedDates.filter((d) => d !== day),
+            rescheduledCount: (t.rescheduledCount || 0) + 1,
           };
         }
         return t;
@@ -139,6 +164,7 @@ export default function PlannerPage({
       monthYear: currentMonth,
       scheduledDates: [],
       completedDates: [],
+      createdByEmployeeId: currentUser.id,
     };
     onTasksChange([...tasks, newTask]);
     setNewTaskTitle("");
@@ -166,18 +192,30 @@ export default function PlannerPage({
     return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   }
 
+  function getTaskTypeLabel(type: TaskType): string {
+    if (type === "permanent") return "Постоянная";
+    if (type === "variable") return "Переменная";
+    return "Внеплановая";
+  }
+
+  function getTaskTypeShort(type: TaskType): string {
+    if (type === "permanent") return "Пост.";
+    if (type === "variable") return "Перем.";
+    return "Внепл.";
+  }
+
   function exportExcel() {
-    const allTasks = [...permanentTasks, ...variableTasks];
+    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks];
     const rows = allTasks.map((t) => {
       const row: Record<string, string> = {
         "Задача": t.title,
-        "Тип": t.type === "permanent" ? "Постоянная" : "Переменная",
-        "Категория": getCategory(t.categoryId)?.name || "—",
-        "Ответственный": getEmployeeName(t.assigneeId) || "—",
+        "Тип": getTaskTypeLabel(t.type),
+        "Категория": getCategory(t.categoryId)?.name || "\u2014",
+        "Ответственный": getEmployeeName(t.assigneeId) || "\u2014",
       };
       days.forEach((day) => {
         const state = getCellState(t, day);
-        row[String(day)] = state === "done" ? "✓" : state === "planned" ? "○" : "";
+        row[String(day)] = state === "done" ? "\u2713" : state === "planned" ? "\u25CB" : "";
       });
       row["Запланировано"] = String(t.scheduledDates.length);
       row["Выполнено"] = String(t.completedDates.length);
@@ -199,15 +237,15 @@ export default function PlannerPage({
 
     const brName = getBranchName(activeBranchId);
     doc.setFontSize(12);
-    doc.text(`${brName} — ${getMonthLabel(currentMonth)}`, 14, 15);
+    doc.text(`${brName} \u2014 ${getMonthLabel(currentMonth)}`, 14, 15);
     doc.setFontSize(8);
     doc.text(`${currentUser.name} | ${currentUser.roleLabel}`, 14, 20);
 
-    const allTasks = [...permanentTasks, ...variableTasks];
+    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks];
     const head = [["Задача", "Тип", "Категория", "Ответственный", ...days.map(String), "План", "Факт"]];
     const body = allTasks.map((t) => [
       t.title,
-      t.type === "permanent" ? "Пост." : "Перем.",
+      getTaskTypeShort(t.type),
       getCategory(t.categoryId)?.name || "-",
       getEmployeeName(t.assigneeId) || "-",
       ...days.map((day) => {
@@ -236,10 +274,6 @@ export default function PlannerPage({
     doc.save(`Планер_${brName}_${currentMonth}.pdf`);
     setShowExportMenu(false);
   }
-
-  const totalScheduled = branchTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
-  const totalCompleted = branchTasks.reduce((acc, t) => acc + t.completedDates.length, 0);
-  const conversionRate = totalScheduled > 0 ? Math.round((totalCompleted / totalScheduled) * 100) : 0;
 
   const TASK_COL_WIDTH = 220;
   const ASSIGNEE_COL_WIDTH = 100;
@@ -285,7 +319,27 @@ export default function PlannerPage({
                 {conversionRate}%
               </strong>
             </span>
+            <span>
+              Перенесено: <strong className="text-warning font-mono">{totalRescheduled}</strong>
+            </span>
+            <span>
+              Не выполнено: <strong className="text-destructive font-mono">{overdueCount}</strong>
+            </span>
           </div>
+
+          {/* Assignee filter */}
+          <select
+            value={filterAssignee}
+            onChange={(e) => setFilterAssignee(e.target.value)}
+            className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background"
+          >
+            <option value="">Все</option>
+            {branchEmployees.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.name.split(" ")[0]}
+              </option>
+            ))}
+          </select>
 
           {todayDay && (
             <button
@@ -348,7 +402,7 @@ export default function PlannerPage({
           <div className="flex items-center gap-2 px-4 py-2.5 border-b border-accent/15">
             <Icon name="CalendarDays" size={13} className="text-accent" />
             <p className="text-xs font-semibold text-foreground">
-              Задачи на сегодня — {todayDay}{" "}
+              Задачи на сегодня -- {todayDay}{" "}
               {new Date(
                 parseInt(currentMonth.split("-")[0]),
                 parseInt(currentMonth.split("-")[1]) - 1,
@@ -406,10 +460,12 @@ export default function PlannerPage({
                       className={`text-[10px] px-1.5 py-0.5 rounded-full ${
                         t.type === "permanent"
                           ? "bg-muted text-muted-foreground"
+                          : t.type === "unplanned"
+                          ? "bg-destructive/10 text-destructive"
                           : "bg-accent/10 text-accent"
                       }`}
                     >
-                      {t.type === "permanent" ? "Пост." : "Перем."}
+                      {getTaskTypeShort(t.type)}
                     </span>
                   </div>
                 );
@@ -517,7 +573,7 @@ export default function PlannerPage({
                       colSpan={days.length + 3}
                       className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border"
                     >
-                      Нет постоянных задач — добавьте ниже
+                      Нет постоянных задач -- добавьте ниже
                     </td>
                   </tr>
                 )}
@@ -556,9 +612,50 @@ export default function PlannerPage({
                   <tr>
                     <td
                       colSpan={days.length + 3}
-                      className="px-4 py-4 text-xs text-muted-foreground italic"
+                      className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border"
                     >
                       Нет переменных задач
+                    </td>
+                  </tr>
+                )}
+
+                <tr className="bg-muted/20">
+                  <td
+                    colSpan={days.length + 3}
+                    className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border"
+                  >
+                    Внеплановые задачи
+                  </td>
+                </tr>
+                {unplannedTasks.map((task) => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    days={days}
+                    currentMonth={currentMonth}
+                    category={getCategory(task.categoryId)}
+                    canEdit={true}
+                    editingTaskId={editingTaskId}
+                    editingTitle={editingTitle}
+                    onEditingTitleChange={setEditingTitle}
+                    onStartEdit={startEdit}
+                    onSaveEdit={saveEdit}
+                    onDelete={deleteTask}
+                    onToggleDate={toggleDate}
+                    getCellState={getCellState}
+                    todayDay={todayDay}
+                    employees={branchEmployees}
+                    assigneeName={getEmployeeName(task.assigneeId)}
+                    onAssigneeChange={updateAssignee}
+                  />
+                ))}
+                {unplannedTasks.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={days.length + 3}
+                      className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border"
+                    >
+                      Нет внеплановых задач
                     </td>
                   </tr>
                 )}
@@ -581,12 +678,13 @@ export default function PlannerPage({
                         <select
                           value={newTaskType}
                           onChange={(e) =>
-                            setNewTaskType(e.target.value as "permanent" | "variable")
+                            setNewTaskType(e.target.value as TaskType)
                           }
                           className="text-xs border border-border rounded px-1.5 py-1.5 outline-none bg-background"
                         >
                           <option value="variable">Переменная</option>
                           <option value="permanent">Постоянная</option>
+                          <option value="unplanned">Внеплановая</option>
                         </select>
                       </div>
                     </td>
@@ -597,7 +695,7 @@ export default function PlannerPage({
                         onChange={(e) => setNewTaskAssignee(e.target.value)}
                         className="w-full text-[10px] border border-border rounded px-1 py-1 outline-none bg-background"
                       >
-                        <option value="">—</option>
+                        <option value="">--</option>
                         {branchEmployees.map((e) => (
                           <option key={e.id} value={e.id}>
                             {e.name.split(" ")[0]}
@@ -656,7 +754,7 @@ export default function PlannerPage({
   );
 }
 
-// ─── TaskRow ────────────────────────────────────────────────────────────────
+// ---- TaskRow ----
 
 interface TaskRowProps {
   task: Task;
@@ -716,26 +814,34 @@ function TaskRow({
             className="w-full text-xs border border-accent rounded px-2 py-1 outline-none bg-background"
           />
         ) : (
-          <div className="flex items-center gap-1.5 min-w-0">
-            {task.fromGroupTaskId && (
-              <Icon name="Link" size={11} className="text-accent flex-shrink-0" />
-            )}
-            <span className="text-xs text-foreground truncate flex-1">{task.title}</span>
-            {canEdit && (
-              <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
-                <button
-                  onClick={() => onStartEdit(task)}
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Icon name="Pencil" size={11} />
-                </button>
-                <button
-                  onClick={() => onDelete(task.id)}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Icon name="Trash2" size={11} />
-                </button>
-              </div>
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex items-center gap-1.5 min-w-0">
+              {task.fromGroupTaskId && (
+                <Icon name="Link" size={11} className="text-accent flex-shrink-0" />
+              )}
+              <span className="text-xs text-foreground truncate flex-1">{task.title}</span>
+              {canEdit && (
+                <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                  <button
+                    onClick={() => onStartEdit(task)}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    <Icon name="Pencil" size={11} />
+                  </button>
+                  <button
+                    onClick={() => onDelete(task.id)}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Icon name="Trash2" size={11} />
+                  </button>
+                </div>
+              )}
+            </div>
+            {task.goalTitle && (
+              <span className="text-[9px] text-accent/70 truncate leading-tight">
+                <Icon name="Target" size={9} className="inline mr-0.5" />
+                {task.goalTitle}
+              </span>
             )}
           </div>
         )}
@@ -779,7 +885,7 @@ function TaskRow({
                 }}
                 className="flex items-center gap-2 w-full px-3 py-2 text-[11px] text-muted-foreground hover:bg-muted/50 transition-colors"
               >
-                — Никто
+                -- Никто
               </button>
               {employees.map((e) => (
                 <button
@@ -809,9 +915,9 @@ function TaskRow({
             onClick={() => onToggleDate(task.id, day)}
             title={
               state === "done"
-                ? "Выполнено — клик снимет"
+                ? "Выполнено -- клик снимет"
                 : state === "planned"
-                ? "Запланировано — клик отметит выполненным"
+                ? "Запланировано -- клик отметит выполненным"
                 : "Клик запланирует"
             }
             className={`border-r border-border last:border-r-0 cursor-pointer transition-colors text-center
@@ -821,9 +927,9 @@ function TaskRow({
             `}
             style={{ width: 32, height: 36 }}
           >
-            {state === "done" && <span className="text-[10px] font-mono">✓</span>}
+            {state === "done" && <span className="text-[10px] font-mono">{"\u2713"}</span>}
             {state === "planned" && (
-              <span className="text-[10px] font-mono">·</span>
+              <span className="text-[10px] font-mono">{"\u00B7"}</span>
             )}
           </td>
         );

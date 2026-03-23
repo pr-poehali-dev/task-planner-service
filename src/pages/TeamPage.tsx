@@ -46,6 +46,7 @@ export default function TeamPage({
     deadline: "",
     categoryId: "",
     assignedEmployeeId: "",
+    noDate: false,
   });
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(
     new Set(groupGoals.map((g) => g.id))
@@ -88,22 +89,37 @@ export default function TeamPage({
   }
 
   function addGroupTask(goalId: string) {
-    if (!newTask.title.trim() || !newTask.assignedEmployeeId || !newTask.deadline) return;
+    if (!newTask.title.trim() || !newTask.assignedEmployeeId) return;
+    if (!newTask.noDate && !newTask.deadline) return;
 
-    const deadline = new Date(newTask.deadline);
-    const deadlineDay = deadline.getDate();
-    const monthYear = `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}`;
+    const goal = groupGoals.find((g) => g.id === goalId);
+    const goalTitle = goal?.title || "";
+
+    let deadlineDay: number | undefined;
+    let monthYear: string;
+    let scheduledDates: number[] = [];
+
+    if (newTask.noDate) {
+      // No date pinned - use current month
+      monthYear = currentMonth;
+    } else {
+      const deadline = new Date(newTask.deadline);
+      deadlineDay = deadline.getDate();
+      monthYear = `${deadline.getFullYear()}-${String(deadline.getMonth() + 1).padStart(2, "0")}`;
+      scheduledDates = [deadlineDay];
+    }
 
     const gt: GroupTask = {
       id: `gt_${Date.now()}`,
       goalId,
       title: newTask.title.trim(),
       branchId: activeBranchId,
-      deadline: newTask.deadline,
+      deadline: newTask.noDate ? undefined : newTask.deadline,
       categoryId: newTask.categoryId || categories[0]?.id || "",
       assignedEmployeeId: newTask.assignedEmployeeId,
       monthYear,
       completedByEmployee: false,
+      createdByEmployeeId: currentUser.id,
     };
 
     const personalTask: Task = {
@@ -114,15 +130,17 @@ export default function TeamPage({
       branchId: activeBranchId,
       categoryId: newTask.categoryId,
       monthYear,
-      scheduledDates: [deadlineDay],
+      scheduledDates,
       completedDates: [],
       fromGroupTaskId: gt.id,
       deadline: deadlineDay,
+      createdByEmployeeId: currentUser.id,
+      goalTitle,
     };
 
     onGroupTasksChange([...groupTasks, gt]);
     onTasksChange([...tasks, personalTask]);
-    setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "" });
+    setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "", noDate: false });
     setAddingTaskForGoal(null);
   }
 
@@ -138,6 +156,27 @@ export default function TeamPage({
     const gt = groupTasks.filter((t) => t.goalId === goalId);
     const done = gt.filter((t) => t.completedByEmployee).length;
     return { total: gt.length, done };
+  }
+
+  function getTaskStatus(gt: GroupTask): { label: string; className: string } {
+    const personalTask = tasks.find((t) => t.fromGroupTaskId === gt.id);
+
+    if (gt.completedByEmployee) {
+      return { label: "Выполнено", className: "bg-success/10 text-success" };
+    }
+
+    if (personalTask && (personalTask.rescheduledCount || 0) > 0) {
+      return { label: "Перенесено", className: "bg-warning/10 text-warning" };
+    }
+
+    if (gt.deadline) {
+      const deadlineDate = new Date(gt.deadline);
+      if (!gt.completedByEmployee && deadlineDate < new Date()) {
+        return { label: "Не выполнено", className: "bg-destructive/10 text-destructive" };
+      }
+    }
+
+    return { label: "В работе", className: "bg-muted text-muted-foreground" };
   }
 
   const isDirector = currentUser.role === "director";
@@ -217,7 +256,7 @@ export default function TeamPage({
                           setAddingTaskForGoal(
                             addingTaskForGoal === goal.id ? null : goal.id
                           );
-                          setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "" });
+                          setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "", noDate: false });
                         }}
                         className="flex items-center gap-1 text-xs text-accent hover:opacity-80 px-2 py-1 rounded border border-accent/30 hover:bg-accent/5 transition-colors"
                       >
@@ -242,7 +281,7 @@ export default function TeamPage({
                 {/* Tasks table */}
                 {isExpanded && (
                   <div className="border-t border-border overflow-x-auto">
-                    <table className="w-full min-w-[500px]">
+                    <table className="w-full min-w-[600px]">
                       <thead>
                         <tr className="border-b border-border bg-muted/30">
                           <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">
@@ -257,7 +296,10 @@ export default function TeamPage({
                           <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-36">
                             Ответственный
                           </th>
-                          <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-24">
+                          <th className="text-left text-xs font-medium text-muted-foreground px-3 py-2 w-28">
+                            Добавил
+                          </th>
+                          <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2 w-28">
                             Статус
                           </th>
                         </tr>
@@ -266,9 +308,11 @@ export default function TeamPage({
                         {goalTasks.map((gt) => {
                           const emp = getEmployee(gt.assignedEmployeeId);
                           const cat = getCategory(gt.categoryId);
-                          const deadlineDate = new Date(gt.deadline);
-                          const isOverdue =
-                            !gt.completedByEmployee && deadlineDate < new Date();
+                          const createdByEmp = gt.createdByEmployeeId ? getEmployee(gt.createdByEmployeeId) : null;
+                          const hasDeadline = !!gt.deadline;
+                          const deadlineDate = hasDeadline ? new Date(gt.deadline!) : null;
+                          const status = getTaskStatus(gt);
+
                           return (
                             <tr
                               key={gt.id}
@@ -278,17 +322,25 @@ export default function TeamPage({
                                 <span className="text-xs text-foreground">{gt.title}</span>
                               </td>
                               <td className="px-3 py-2.5">
-                                <span
-                                  className={`text-xs font-mono ${
-                                    isOverdue ? "text-destructive" : "text-muted-foreground"
-                                  }`}
-                                >
-                                  {deadlineDate.toLocaleDateString("ru-RU", {
-                                    day: "numeric",
-                                    month: "short",
-                                  })}
-                                  {isOverdue && " ⚠"}
-                                </span>
+                                {hasDeadline && deadlineDate ? (
+                                  <span
+                                    className={`text-xs font-mono ${
+                                      !gt.completedByEmployee && deadlineDate < new Date()
+                                        ? "text-destructive"
+                                        : "text-muted-foreground"
+                                    }`}
+                                  >
+                                    {deadlineDate.toLocaleDateString("ru-RU", {
+                                      day: "numeric",
+                                      month: "short",
+                                    })}
+                                    {!gt.completedByEmployee && deadlineDate < new Date() && " !"}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground/50 italic">
+                                    Без даты
+                                  </span>
+                                )}
                               </td>
                               <td className="px-3 py-2.5">
                                 {cat && (
@@ -313,15 +365,20 @@ export default function TeamPage({
                                   </span>
                                 </div>
                               </td>
+                              <td className="px-3 py-2.5">
+                                {createdByEmp ? (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {createdByEmp.name.split(" ")[0]}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground/40">--</span>
+                                )}
+                              </td>
                               <td className="px-3 py-2.5 text-center">
                                 <span
-                                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                                    gt.completedByEmployee
-                                      ? "bg-success/10 text-success"
-                                      : "bg-muted text-muted-foreground"
-                                  }`}
+                                  className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${status.className}`}
                                 >
-                                  {gt.completedByEmployee ? "Выполнено" : "В работе"}
+                                  {status.label}
                                 </span>
                               </td>
                             </tr>
@@ -330,10 +387,10 @@ export default function TeamPage({
                         {goalTasks.length === 0 && (
                           <tr>
                             <td
-                              colSpan={5}
+                              colSpan={6}
                               className="px-4 py-5 text-xs text-muted-foreground text-center"
                             >
-                              Нет задач — нажмите «+ Задача» чтобы добавить
+                              Нет задач -- нажмите "+ Задача" чтобы добавить
                             </td>
                           </tr>
                         )}
@@ -354,14 +411,29 @@ export default function TeamPage({
                             placeholder="Название задачи"
                             className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background col-span-2"
                           />
-                          <input
-                            type="date"
-                            value={newTask.deadline}
-                            onChange={(e) =>
-                              setNewTask((p) => ({ ...p, deadline: e.target.value }))
-                            }
-                            className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
-                          />
+                          <label className="flex items-center gap-2 cursor-pointer col-span-2">
+                            <input
+                              type="checkbox"
+                              checked={newTask.noDate}
+                              onChange={(e) =>
+                                setNewTask((p) => ({ ...p, noDate: e.target.checked, deadline: "" }))
+                              }
+                              className="rounded border-border"
+                            />
+                            <span className="text-xs text-muted-foreground">
+                              Без привязки к дате
+                            </span>
+                          </label>
+                          {!newTask.noDate && (
+                            <input
+                              type="date"
+                              value={newTask.deadline}
+                              onChange={(e) =>
+                                setNewTask((p) => ({ ...p, deadline: e.target.value }))
+                              }
+                              className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
+                            />
+                          )}
                           <select
                             value={newTask.categoryId}
                             onChange={(e) =>
@@ -389,7 +461,7 @@ export default function TeamPage({
                             <option value="">Выбрать ответственного</option>
                             {branchEmployees.map((e) => (
                               <option key={e.id} value={e.id}>
-                                {e.name} — {e.roleLabel}
+                                {e.name} -- {e.roleLabel}
                               </option>
                             ))}
                           </select>
@@ -475,7 +547,7 @@ export default function TeamPage({
               <p className="text-sm text-muted-foreground">Нет целей для этого филиала</p>
               {isDirector && (
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  Нажмите «Добавить цель» чтобы начать
+                  Нажмите "Добавить цель" чтобы начать
                 </p>
               )}
             </div>
