@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import { type Employee, EMPLOYEE_PASSWORDS } from "@/store/data";
+import { type Employee } from "@/store/data";
 
 interface Props {
   employees: Employee[];
@@ -181,22 +181,7 @@ export default function LoginPage({ employees, onLogin, passwords }: Props) {
           </button>
         </div>
 
-        {/* Hint for demo */}
-        <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-          <p className="text-[11px] text-muted-foreground text-center mb-1.5 font-medium">
-            Тестовые пароли
-          </p>
-          <div className="grid grid-cols-2 gap-1">
-            {employees.map((emp) => (
-              <div key={emp.id} className="flex items-center justify-between text-[11px]">
-                <span className="text-muted-foreground truncate">{emp.name.split(" ")[0]}</span>
-                <span className="font-mono text-foreground/60 ml-1">
-                  {passwords[emp.id] || "—"}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+
       </div>
     </div>
   );

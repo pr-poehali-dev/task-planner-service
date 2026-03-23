@@ -11,6 +11,7 @@ import {
   type Category,
   type PersonalGoal,
   type UserTaskType,
+  type Note,
   getDaysInMonth,
   getWeekdayName,
   isWeekend,
@@ -30,6 +31,8 @@ interface Props {
   onPersonalGoalsChange: (goals: PersonalGoal[]) => void;
   userTaskTypes: UserTaskType[];
   onUserTaskTypesChange: (types: UserTaskType[]) => void;
+  notes: Note[];
+  onNavigate: (page: string) => void;
 }
 
 export default function PlannerPage({
@@ -44,6 +47,8 @@ export default function PlannerPage({
   onPersonalGoalsChange,
   userTaskTypes,
   onUserTaskTypesChange,
+  notes,
+  onNavigate,
 }: Props) {
   const userBranches = branches.filter((b) =>
     currentUser.branchIds.includes(b.id)
@@ -70,6 +75,7 @@ export default function PlannerPage({
   const [newTypeName, setNewTypeName] = useState("");
   const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
   const [editingTypeName, setEditingTypeName] = useState("");
+  const [selectedDateDay, setSelectedDateDay] = useState<number | null>(null);
 
   const isNoBranch = activeBranchId === NO_BRANCH_ID;
 
@@ -118,6 +124,22 @@ export default function PlannerPage({
     : employees.filter((e) =>
         e.branchIds.includes(activeBranchId) && e.id !== currentUser.id
       );
+
+  const myNotes = notes.filter(
+    (n) =>
+      n.ownerEmployeeId === currentUser.id ||
+      n.sharedWithEmployeeIds.includes(currentUser.id)
+  );
+
+  // Selected date tasks (across all branches for this user)
+  const selectedDateTasks = selectedDateDay
+    ? tasks.filter(
+        (t) =>
+          t.employeeId === currentUser.id &&
+          t.monthYear === currentMonth &&
+          (t.scheduledDates.includes(selectedDateDay) || t.completedDates.includes(selectedDateDay))
+      )
+    : [];
 
   // Stats
   const totalScheduled = branchTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
@@ -191,6 +213,22 @@ export default function PlannerPage({
     onTasksChange(
       tasks.map((t) =>
         t.id === taskId ? { ...t, comment: comment || undefined } : t
+      )
+    );
+  }
+
+  function linkNoteToTask(taskId: string, noteId: string) {
+    onTasksChange(
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, linkedNoteId: noteId } : t
+      )
+    );
+  }
+
+  function unlinkNote(taskId: string) {
+    onTasksChange(
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, linkedNoteId: undefined } : t
       )
     );
   }
@@ -643,6 +681,84 @@ export default function PlannerPage({
         </div>
       )}
 
+      {/* Selected date panel */}
+      {selectedDateDay !== null && (
+        <div className="mx-4 md:mx-6 mt-3 rounded-lg today-panel overflow-hidden animate-fade-in flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-warning/20">
+            <Icon name="CalendarDays" size={13} className="text-warning" />
+            <p className="text-xs font-semibold text-foreground">
+              {selectedDateDay}{" "}
+              {new Date(
+                parseInt(currentMonth.split("-")[0]),
+                parseInt(currentMonth.split("-")[1]) - 1,
+                selectedDateDay
+              ).toLocaleDateString("ru-RU", { month: "long" })}
+            </p>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {selectedDateTasks.filter((t) => t.completedDates.includes(selectedDateDay)).length} из{" "}
+              {selectedDateTasks.length} выполнено
+            </span>
+            <button
+              onClick={() => setSelectedDateDay(null)}
+              className="text-muted-foreground hover:text-foreground ml-2"
+            >
+              <Icon name="X" size={14} />
+            </button>
+          </div>
+          {selectedDateTasks.length === 0 ? (
+            <p className="px-4 py-3 text-xs text-muted-foreground">Нет задач на эту дату</p>
+          ) : (
+            <div className="divide-y divide-accent/10">
+              {selectedDateTasks.map((t) => {
+                const isDone = t.completedDates.includes(selectedDateDay);
+                const cat = getCategory(t.categoryId);
+                return (
+                  <div
+                    key={t.id}
+                    className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent/5 transition-colors"
+                  >
+                    <button
+                      onClick={() => toggleDate(t.id, selectedDateDay)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 transition-all ${
+                        isDone
+                          ? "bg-success border-success text-white"
+                          : "border-border hover:border-success"
+                      }`}
+                    >
+                      {isDone && <Icon name="Check" size={10} />}
+                    </button>
+                    <span
+                      className={`text-xs flex-1 ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}
+                    >
+                      {t.title}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {getBranchName(t.branchId)}
+                    </span>
+                    {cat && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full badge-${cat.color}`}>
+                        {cat.name}
+                      </span>
+                    )}
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                        t.type === "permanent"
+                          ? "bg-muted text-muted-foreground"
+                          : t.type === "unplanned"
+                          ? "bg-destructive/10 text-destructive"
+                          : "bg-accent/10 text-accent"
+                      }`}
+                    >
+                      {getTaskTypeShort(t.type, t.customTypeId)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Custom type manager */}
       {showTypeManager && (
         <div className="mx-4 md:mx-6 mt-3 border border-border rounded-lg bg-card overflow-hidden animate-fade-in flex-shrink-0">
@@ -869,10 +985,11 @@ export default function PlannerPage({
                   {days.map((day) => (
                     <th
                       key={day}
-                      className={`text-center border-r border-border last:border-r-0 ${
+                      className={`text-center border-r border-border last:border-r-0 cursor-pointer ${
                         isWeekend(day, currentMonth) ? "bg-muted/60" : ""
-                      } ${todayDay === day ? "bg-accent/10" : ""}`}
+                      } ${todayDay === day ? "bg-accent/10" : ""} ${selectedDateDay === day ? "bg-accent/20" : ""}`}
                       style={{ width: DATE_COL_WIDTH, minWidth: DATE_COL_WIDTH }}
+                      onClick={() => setSelectedDateDay(day === selectedDateDay ? null : day)}
                     >
                       <div className="flex flex-col items-center py-1.5 gap-0.5">
                         <span
@@ -886,7 +1003,9 @@ export default function PlannerPage({
                         </span>
                         <span
                           className={`text-xs font-mono font-medium leading-none ${
-                            todayDay === day
+                            selectedDateDay === day
+                              ? "text-accent"
+                              : todayDay === day
                               ? "text-accent"
                               : isWeekend(day, currentMonth)
                               ? "text-muted-foreground"
@@ -931,6 +1050,10 @@ export default function PlannerPage({
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
                     onCommentChange={updateComment}
+                    notes={myNotes}
+                    onNavigate={onNavigate}
+                    onLinkNote={linkNoteToTask}
+                    onUnlinkNote={unlinkNote}
                   />
                 ))}
                 {permanentTasks.length === 0 && (
@@ -973,6 +1096,10 @@ export default function PlannerPage({
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
                     onCommentChange={updateComment}
+                    notes={myNotes}
+                    onNavigate={onNavigate}
+                    onLinkNote={linkNoteToTask}
+                    onUnlinkNote={unlinkNote}
                   />
                 ))}
                 {variableTasks.length === 0 && (
@@ -1015,6 +1142,10 @@ export default function PlannerPage({
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
                     onCommentChange={updateComment}
+                    notes={myNotes}
+                    onNavigate={onNavigate}
+                    onLinkNote={linkNoteToTask}
+                    onUnlinkNote={unlinkNote}
                   />
                 ))}
                 {unplannedTasks.length === 0 && (
@@ -1196,6 +1327,10 @@ interface TaskRowProps {
   assigneeName: string;
   onAssigneeChange: (taskId: string, assigneeId: string) => void;
   onCommentChange: (taskId: string, comment: string) => void;
+  notes: Note[];
+  onNavigate: (page: string) => void;
+  onLinkNote: (taskId: string, noteId: string) => void;
+  onUnlinkNote: (taskId: string) => void;
 }
 
 function TaskRow({
@@ -1217,11 +1352,17 @@ function TaskRow({
   assigneeName,
   onAssigneeChange,
   onCommentChange,
+  notes,
+  onNavigate,
+  onLinkNote,
+  onUnlinkNote,
 }: TaskRowProps) {
   const isEditing = editingTaskId === task.id;
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const [editingComment, setEditingComment] = useState(false);
   const [commentDraft, setCommentDraft] = useState(task.comment || "");
+  const [showNoteDropdown, setShowNoteDropdown] = useState(false);
+  const linkedNote = task.linkedNoteId ? notes.find((n) => n.id === task.linkedNoteId) : null;
 
   return (
     <tr className="border-b border-border hover:bg-muted/10 group transition-colors">
@@ -1257,6 +1398,12 @@ function TaskRow({
                     <Icon name="MessageSquare" size={11} />
                   </button>
                   <button
+                    onClick={() => setShowNoteDropdown(!showNoteDropdown)}
+                    className={`text-muted-foreground hover:text-accent ${task.linkedNoteId ? "text-accent" : ""}`}
+                  >
+                    <Icon name="StickyNote" size={11} />
+                  </button>
+                  <button
                     onClick={() => onStartEdit(task)}
                     className="text-muted-foreground hover:text-foreground"
                   >
@@ -1276,6 +1423,52 @@ function TaskRow({
                 <Icon name="Target" size={9} className="inline mr-0.5" />
                 {task.goalTitle}
               </span>
+            )}
+            {linkedNote && (
+              <span className="text-[9px] text-accent/70 truncate leading-tight flex items-center gap-0.5">
+                <Icon name="StickyNote" size={9} className="inline flex-shrink-0" />
+                <button
+                  onClick={() => onNavigate("notes")}
+                  className="hover:underline truncate"
+                >
+                  {linkedNote.title}
+                </button>
+                <button
+                  onClick={() => onUnlinkNote(task.id)}
+                  className="text-muted-foreground hover:text-destructive flex-shrink-0 ml-0.5"
+                >
+                  <Icon name="X" size={8} />
+                </button>
+              </span>
+            )}
+            {showNoteDropdown && (
+              <div className="relative">
+                <div className="fixed inset-0 z-20" onClick={() => setShowNoteDropdown(false)} />
+                <div className="absolute left-0 top-0 z-30 bg-card border border-border rounded-lg shadow-lg overflow-hidden animate-fade-in min-w-[180px] max-h-[200px] overflow-y-auto">
+                  <p className="px-3 py-2 text-[10px] font-medium text-muted-foreground border-b border-border">
+                    Привязать заметку
+                  </p>
+                  {notes.length === 0 ? (
+                    <p className="px-3 py-2 text-[10px] text-muted-foreground italic">Нет заметок</p>
+                  ) : (
+                    notes.map((n) => (
+                      <button
+                        key={n.id}
+                        onClick={() => {
+                          onLinkNote(task.id, n.id);
+                          setShowNoteDropdown(false);
+                        }}
+                        className={`flex items-center gap-2 w-full px-3 py-2 text-[11px] hover:bg-muted/50 transition-colors ${
+                          task.linkedNoteId === n.id ? "text-accent font-medium" : "text-foreground"
+                        }`}
+                      >
+                        <Icon name="StickyNote" size={11} />
+                        <span className="truncate">{n.title}</span>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
             )}
             {task.comment && !editingComment && (
               <span className="text-[9px] text-muted-foreground truncate leading-tight">
