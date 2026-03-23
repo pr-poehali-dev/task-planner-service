@@ -9,6 +9,8 @@ export interface PersistedData {
   groupTasks: unknown[];
   personalGoals: unknown[];
   userTaskTypes: unknown[];
+  notes: unknown[];
+  files: unknown[];
   passwords: Record<string, string>;
   currentUserId: string | null;
 }

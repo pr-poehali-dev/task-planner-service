@@ -56,6 +56,7 @@ export interface Task {
   goalTitle?: string;
   personalGoalId?: string;
   customTypeId?: string;
+  comment?: string;
 }
 
 export interface GroupGoal {
@@ -336,6 +337,45 @@ export const MOCK_GROUP_TASKS: GroupTask[] = [
 export const MOCK_PERSONAL_GOALS: PersonalGoal[] = [];
 
 export const MOCK_USER_TASK_TYPES: UserTaskType[] = [];
+
+// ─── Notes ──────────────────────────────────────────────────────────────────
+
+export interface NoteAttachment {
+  id: string;
+  name: string;
+  dataUrl: string;
+  type: string;
+  size: number;
+}
+
+export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  ownerEmployeeId: string;
+  sharedWithEmployeeIds: string[];
+  sharedFromEmployeeId?: string;
+  attachments: NoteAttachment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const MOCK_NOTES: Note[] = [];
+
+// ─── Shared Files ───────────────────────────────────────────────────────────
+
+export interface SharedFile {
+  id: string;
+  name: string;
+  dataUrl: string;
+  type: string;
+  size: number;
+  ownerEmployeeId: string;
+  sharedWithEmployeeIds: string[];
+  createdAt: string;
+}
+
+export const MOCK_FILES: SharedFile[] = [];
 
 export function getDaysInMonth(monthYear: string): number[] {
   const [year, month] = monthYear.split("-").map(Number);

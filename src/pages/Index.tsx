@@ -6,6 +6,8 @@ import TeamPage from "@/pages/TeamPage";
 import ManagementPage from "@/pages/ManagementPage";
 import StatisticsPage from "@/pages/StatisticsPage";
 import ProfilePage from "@/pages/ProfilePage";
+import NotesPage from "@/pages/NotesPage";
+import FilesPage from "@/pages/FilesPage";
 import {
   MOCK_BRANCHES,
   MOCK_EMPLOYEES,
@@ -15,6 +17,8 @@ import {
   MOCK_GROUP_TASKS,
   MOCK_PERSONAL_GOALS,
   MOCK_USER_TASK_TYPES,
+  MOCK_NOTES,
+  MOCK_FILES,
   EMPLOYEE_PASSWORDS,
   DEFAULT_PERMISSIONS,
   type Branch,
@@ -25,6 +29,8 @@ import {
   type GroupTask,
   type PersonalGoal,
   type UserTaskType,
+  type Note,
+  type SharedFile,
 } from "@/store/data";
 import { loadFromStorage, saveToStorage } from "@/store/persist";
 
@@ -40,6 +46,8 @@ function getInitialState() {
       groupTasks: (saved.groupTasks || MOCK_GROUP_TASKS) as GroupTask[],
       personalGoals: (saved.personalGoals || MOCK_PERSONAL_GOALS) as PersonalGoal[],
       userTaskTypes: (saved.userTaskTypes || MOCK_USER_TASK_TYPES) as UserTaskType[],
+      notes: (saved.notes || MOCK_NOTES) as Note[],
+      files: (saved.files || MOCK_FILES) as SharedFile[],
       passwords: saved.passwords || EMPLOYEE_PASSWORDS,
       currentUserId: saved.currentUserId,
     };
@@ -53,6 +61,8 @@ function getInitialState() {
     groupTasks: MOCK_GROUP_TASKS,
     personalGoals: MOCK_PERSONAL_GOALS,
     userTaskTypes: MOCK_USER_TASK_TYPES,
+    notes: MOCK_NOTES,
+    files: MOCK_FILES,
     passwords: EMPLOYEE_PASSWORDS,
     currentUserId: null as string | null,
   };
@@ -75,6 +85,8 @@ export default function Index() {
   const [groupTasks, setGroupTasks] = useState<GroupTask[]>(initial.groupTasks);
   const [personalGoals, setPersonalGoals] = useState<PersonalGoal[]>(initial.personalGoals);
   const [userTaskTypes, setUserTaskTypes] = useState<UserTaskType[]>(initial.userTaskTypes);
+  const [notes, setNotes] = useState<Note[]>(initial.notes);
+  const [sharedFiles, setSharedFiles] = useState<SharedFile[]>(initial.files);
   const [passwords, setPasswords] = useState<Record<string, string>>(initial.passwords);
   const [currentUser, setCurrentUser] = useState<Employee | null>(
     initial.currentUserId
@@ -94,10 +106,12 @@ export default function Index() {
       groupTasks,
       personalGoals,
       userTaskTypes,
+      notes,
+      files: sharedFiles,
       passwords,
       currentUserId: currentUser?.id || null,
     });
-  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, passwords, currentUser]);
+  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, notes, sharedFiles, passwords, currentUser]);
 
   useEffect(() => {
     persist();
@@ -261,6 +275,22 @@ export default function Index() {
           tasks={tasks}
           groupTasks={isDirector ? groupTasks : visibleGroupTasks}
           currentMonth={currentMonth}
+        />
+      )}
+      {activePage === "notes" && (
+        <NotesPage
+          currentUser={currentUser}
+          employees={employees}
+          notes={notes}
+          onNotesChange={setNotes}
+        />
+      )}
+      {activePage === "files" && (
+        <FilesPage
+          currentUser={currentUser}
+          employees={employees}
+          files={sharedFiles}
+          onFilesChange={setSharedFiles}
         />
       )}
       {activePage === "profile" && (

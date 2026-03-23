@@ -187,6 +187,14 @@ export default function PlannerPage({
     );
   }
 
+  function updateComment(taskId: string, comment: string) {
+    onTasksChange(
+      tasks.map((t) =>
+        t.id === taskId ? { ...t, comment: comment || undefined } : t
+      )
+    );
+  }
+
   function addTask() {
     if (!newTaskTitle.trim()) return;
     // Determine if the selected type is a custom type
@@ -922,6 +930,7 @@ export default function PlannerPage({
                     employees={branchEmployees}
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
+                    onCommentChange={updateComment}
                   />
                 ))}
                 {permanentTasks.length === 0 && (
@@ -963,6 +972,7 @@ export default function PlannerPage({
                     employees={branchEmployees}
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
+                    onCommentChange={updateComment}
                   />
                 ))}
                 {variableTasks.length === 0 && (
@@ -1004,6 +1014,7 @@ export default function PlannerPage({
                     employees={branchEmployees}
                     assigneeName={getEmployeeName(task.assigneeId)}
                     onAssigneeChange={updateAssignee}
+                    onCommentChange={updateComment}
                   />
                 ))}
                 {unplannedTasks.length === 0 && (
@@ -1050,6 +1061,7 @@ export default function PlannerPage({
                           employees={branchEmployees}
                           assigneeName={getEmployeeName(task.assigneeId)}
                           onAssigneeChange={updateAssignee}
+                          onCommentChange={updateComment}
                         />
                       ))}
                       {ctTasks.length === 0 && (
@@ -1183,6 +1195,7 @@ interface TaskRowProps {
   employees: Employee[];
   assigneeName: string;
   onAssigneeChange: (taskId: string, assigneeId: string) => void;
+  onCommentChange: (taskId: string, comment: string) => void;
 }
 
 function TaskRow({
@@ -1203,9 +1216,12 @@ function TaskRow({
   employees,
   assigneeName,
   onAssigneeChange,
+  onCommentChange,
 }: TaskRowProps) {
   const isEditing = editingTaskId === task.id;
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
+  const [editingComment, setEditingComment] = useState(false);
+  const [commentDraft, setCommentDraft] = useState(task.comment || "");
 
   return (
     <tr className="border-b border-border hover:bg-muted/10 group transition-colors">
@@ -1232,6 +1248,15 @@ function TaskRow({
               {canEdit && (
                 <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
                   <button
+                    onClick={() => {
+                      setCommentDraft(task.comment || "");
+                      setEditingComment(true);
+                    }}
+                    className="text-muted-foreground hover:text-accent"
+                  >
+                    <Icon name="MessageSquare" size={11} />
+                  </button>
+                  <button
                     onClick={() => onStartEdit(task)}
                     className="text-muted-foreground hover:text-foreground"
                   >
@@ -1251,6 +1276,42 @@ function TaskRow({
                 <Icon name="Target" size={9} className="inline mr-0.5" />
                 {task.goalTitle}
               </span>
+            )}
+            {task.comment && !editingComment && (
+              <span className="text-[9px] text-muted-foreground truncate leading-tight">
+                <Icon name="MessageSquare" size={9} className="inline mr-0.5" />
+                {task.comment}
+              </span>
+            )}
+            {editingComment && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <input
+                  autoFocus
+                  value={commentDraft}
+                  onChange={(e) => setCommentDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onCommentChange(task.id, commentDraft.trim());
+                      setEditingComment(false);
+                    }
+                    if (e.key === "Escape") setEditingComment(false);
+                  }}
+                  placeholder="Комментарий..."
+                  className="flex-1 text-[10px] border border-border rounded px-1.5 py-0.5 outline-none focus:border-accent bg-background"
+                />
+                <button
+                  onClick={() => {
+                    onCommentChange(task.id, commentDraft.trim());
+                    setEditingComment(false);
+                  }}
+                  className="text-success"
+                >
+                  <Icon name="Check" size={11} />
+                </button>
+                <button onClick={() => setEditingComment(false)} className="text-muted-foreground">
+                  <Icon name="X" size={11} />
+                </button>
+              </div>
             )}
           </div>
         )}
