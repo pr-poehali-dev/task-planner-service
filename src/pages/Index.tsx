@@ -13,6 +13,8 @@ import {
   MOCK_TASKS,
   MOCK_GROUP_GOALS,
   MOCK_GROUP_TASKS,
+  MOCK_PERSONAL_GOALS,
+  MOCK_USER_TASK_TYPES,
   EMPLOYEE_PASSWORDS,
   DEFAULT_PERMISSIONS,
   type Branch,
@@ -21,6 +23,8 @@ import {
   type Task,
   type GroupGoal,
   type GroupTask,
+  type PersonalGoal,
+  type UserTaskType,
 } from "@/store/data";
 import { loadFromStorage, saveToStorage } from "@/store/persist";
 
@@ -34,6 +38,8 @@ function getInitialState() {
       tasks: (saved.tasks || MOCK_TASKS) as Task[],
       groupGoals: (saved.groupGoals || MOCK_GROUP_GOALS) as GroupGoal[],
       groupTasks: (saved.groupTasks || MOCK_GROUP_TASKS) as GroupTask[],
+      personalGoals: (saved.personalGoals || MOCK_PERSONAL_GOALS) as PersonalGoal[],
+      userTaskTypes: (saved.userTaskTypes || MOCK_USER_TASK_TYPES) as UserTaskType[],
       passwords: saved.passwords || EMPLOYEE_PASSWORDS,
       currentUserId: saved.currentUserId,
     };
@@ -45,6 +51,8 @@ function getInitialState() {
     tasks: MOCK_TASKS,
     groupGoals: MOCK_GROUP_GOALS,
     groupTasks: MOCK_GROUP_TASKS,
+    personalGoals: MOCK_PERSONAL_GOALS,
+    userTaskTypes: MOCK_USER_TASK_TYPES,
     passwords: EMPLOYEE_PASSWORDS,
     currentUserId: null as string | null,
   };
@@ -65,6 +73,8 @@ export default function Index() {
   const [tasks, setTasks] = useState<Task[]>(initial.tasks);
   const [groupGoals, setGroupGoals] = useState<GroupGoal[]>(initial.groupGoals);
   const [groupTasks, setGroupTasks] = useState<GroupTask[]>(initial.groupTasks);
+  const [personalGoals, setPersonalGoals] = useState<PersonalGoal[]>(initial.personalGoals);
+  const [userTaskTypes, setUserTaskTypes] = useState<UserTaskType[]>(initial.userTaskTypes);
   const [passwords, setPasswords] = useState<Record<string, string>>(initial.passwords);
   const [currentUser, setCurrentUser] = useState<Employee | null>(
     initial.currentUserId
@@ -82,10 +92,12 @@ export default function Index() {
       tasks,
       groupGoals,
       groupTasks,
+      personalGoals,
+      userTaskTypes,
       passwords,
       currentUserId: currentUser?.id || null,
     });
-  }, [branches, employees, categories, tasks, groupGoals, groupTasks, passwords, currentUser]);
+  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, passwords, currentUser]);
 
   useEffect(() => {
     persist();
@@ -205,6 +217,10 @@ export default function Index() {
           tasks={tasks}
           onTasksChange={handleTasksChange}
           currentMonth={currentMonth}
+          personalGoals={personalGoals}
+          onPersonalGoalsChange={setPersonalGoals}
+          userTaskTypes={userTaskTypes}
+          onUserTaskTypesChange={setUserTaskTypes}
         />
       )}
       {activePage === "team" && (isDirector || (currentUser.permissions || DEFAULT_PERMISSIONS).canViewTeamPlanner) && (

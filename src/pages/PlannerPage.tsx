@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import Icon from "@/components/ui/icon";
 import * as XLSX from "xlsx";
 import { jsPDF } from "jspdf";
@@ -9,10 +9,14 @@ import {
   type Employee,
   type Branch,
   type Category,
+  type PersonalGoal,
+  type UserTaskType,
   getDaysInMonth,
   getWeekdayName,
   isWeekend,
 } from "@/store/data";
+
+const NO_BRANCH_ID = "__no_branch__";
 
 interface Props {
   currentUser: Employee;
@@ -22,6 +26,10 @@ interface Props {
   tasks: Task[];
   onTasksChange: (tasks: Task[]) => void;
   currentMonth: string;
+  personalGoals: PersonalGoal[];
+  onPersonalGoalsChange: (goals: PersonalGoal[]) => void;
+  userTaskTypes: UserTaskType[];
+  onUserTaskTypesChange: (types: UserTaskType[]) => void;
 }
 
 export default function PlannerPage({
@@ -32,6 +40,10 @@ export default function PlannerPage({
   tasks,
   onTasksChange,
   currentMonth,
+  personalGoals,
+  onPersonalGoalsChange,
+  userTaskTypes,
+  onUserTaskTypesChange,
 }: Props) {
   const userBranches = branches.filter((b) =>
     currentUser.branchIds.includes(b.id)
@@ -46,6 +58,20 @@ export default function PlannerPage({
   const [showToday, setShowToday] = useState(false);
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [filterAssignee, setFilterAssignee] = useState<string>("");
+  // Personal goals
+  const [showGoals, setShowGoals] = useState(true);
+  const [addingGoal, setAddingGoal] = useState(false);
+  const [newGoalTitle, setNewGoalTitle] = useState("");
+  const [expandedGoalIds, setExpandedGoalIds] = useState<Set<string>>(new Set());
+  const [addingGoalTask, setAddingGoalTask] = useState<string | null>(null);
+  const [goalTaskTitle, setGoalTaskTitle] = useState("");
+  // Custom task types
+  const [showTypeManager, setShowTypeManager] = useState(false);
+  const [newTypeName, setNewTypeName] = useState("");
+  const [editingTypeId, setEditingTypeId] = useState<string | null>(null);
+  const [editingTypeName, setEditingTypeName] = useState("");
+
+  const isNoBranch = activeBranchId === NO_BRANCH_ID;
 
   const days = getDaysInMonth(currentMonth);
 
@@ -67,9 +93,16 @@ export default function PlannerPage({
     ? allBranchTasks.filter((t) => t.assigneeId === filterAssignee)
     : allBranchTasks;
 
+  const myCustomTypes = userTaskTypes.filter((ut) => ut.employeeId === currentUser.id);
+
   const permanentTasks = branchTasks.filter((t) => t.type === "permanent");
-  const variableTasks = branchTasks.filter((t) => t.type === "variable");
+  const variableTasks = branchTasks.filter((t) => t.type === "variable" && !t.customTypeId);
   const unplannedTasks = branchTasks.filter((t) => t.type === "unplanned");
+
+  // Personal goals for this user/month
+  const myGoals = personalGoals.filter(
+    (g) => g.employeeId === currentUser.id && g.monthYear === currentMonth
+  );
 
   const todayTasks = todayDay
     ? tasks.filter(
@@ -80,9 +113,11 @@ export default function PlannerPage({
       )
     : [];
 
-  const branchEmployees = employees.filter((e) =>
-    e.branchIds.includes(activeBranchId) && e.id !== currentUser.id
-  );
+  const branchEmployees = isNoBranch
+    ? employees.filter((e) => e.id !== currentUser.id)
+    : employees.filter((e) =>
+        e.branchIds.includes(activeBranchId) && e.id !== currentUser.id
+      );
 
   // Stats
   const totalScheduled = branchTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
@@ -154,10 +189,12 @@ export default function PlannerPage({
 
   function addTask() {
     if (!newTaskTitle.trim()) return;
+    // Determine if the selected type is a custom type
+    const isCustom = myCustomTypes.some((ct) => ct.id === newTaskType);
     const newTask: Task = {
       id: `t_${Date.now()}`,
       title: newTaskTitle.trim(),
-      type: newTaskType,
+      type: isCustom ? "variable" : newTaskType,
       employeeId: currentUser.id,
       branchId: activeBranchId,
       assigneeId: newTaskAssignee || undefined,
@@ -165,6 +202,7 @@ export default function PlannerPage({
       scheduledDates: [],
       completedDates: [],
       createdByEmployeeId: currentUser.id,
+      customTypeId: isCustom ? newTaskType : undefined,
     };
     onTasksChange([...tasks, newTask]);
     setNewTaskTitle("");
@@ -183,6 +221,7 @@ export default function PlannerPage({
   }
 
   function getBranchName(branchId: string) {
+    if (branchId === NO_BRANCH_ID) return "Общие";
     return branches.find((b) => b.id === branchId)?.name || branchId;
   }
 
@@ -192,24 +231,117 @@ export default function PlannerPage({
     return d.toLocaleDateString("ru-RU", { month: "long", year: "numeric" });
   }
 
-  function getTaskTypeLabel(type: TaskType): string {
+  function getTaskTypeLabel(type: TaskType, customTypeId?: string): string {
     if (type === "permanent") return "Постоянная";
+    if (type === "variable" && customTypeId) {
+      const ct = userTaskTypes.find((ut) => ut.id === customTypeId);
+      return ct ? ct.label : "Переменная";
+    }
     if (type === "variable") return "Переменная";
-    return "Внеплановая";
+    if (type === "unplanned") return "Внеплановая";
+    return type;
   }
 
-  function getTaskTypeShort(type: TaskType): string {
+  function getTaskTypeShort(type: TaskType, customTypeId?: string): string {
     if (type === "permanent") return "Пост.";
+    if (type === "variable" && customTypeId) {
+      const ct = userTaskTypes.find((ut) => ut.id === customTypeId);
+      return ct ? ct.label.slice(0, 6) : "Перем.";
+    }
     if (type === "variable") return "Перем.";
-    return "Внепл.";
+    if (type === "unplanned") return "Внепл.";
+    return type.slice(0, 6);
+  }
+
+  // Personal goal functions
+  function addPersonalGoal() {
+    if (!newGoalTitle.trim()) return;
+    const goal: PersonalGoal = {
+      id: `pg_${Date.now()}`,
+      title: newGoalTitle.trim(),
+      employeeId: currentUser.id,
+      monthYear: currentMonth,
+    };
+    onPersonalGoalsChange([...personalGoals, goal]);
+    setNewGoalTitle("");
+    setAddingGoal(false);
+    setExpandedGoalIds((prev) => new Set([...prev, goal.id]));
+  }
+
+  function deletePersonalGoal(goalId: string) {
+    onPersonalGoalsChange(personalGoals.filter((g) => g.id !== goalId));
+    // Remove goalId from tasks
+    onTasksChange(tasks.map((t) => t.personalGoalId === goalId ? { ...t, personalGoalId: undefined } : t));
+  }
+
+  function addTaskFromGoal(goalId: string) {
+    if (!goalTaskTitle.trim()) return;
+    const goal = personalGoals.find((g) => g.id === goalId);
+    const newTask: Task = {
+      id: `t_${Date.now()}`,
+      title: goalTaskTitle.trim(),
+      type: "variable",
+      employeeId: currentUser.id,
+      branchId: activeBranchId,
+      monthYear: currentMonth,
+      scheduledDates: [],
+      completedDates: [],
+      createdByEmployeeId: currentUser.id,
+      goalTitle: goal?.title,
+      personalGoalId: goalId,
+    };
+    onTasksChange([...tasks, newTask]);
+    setGoalTaskTitle("");
+    setAddingGoalTask(null);
+  }
+
+  function getGoalProgress(goalId: string) {
+    const goalTasks = tasks.filter(
+      (t) => t.personalGoalId === goalId && t.monthYear === currentMonth
+    );
+    const total = goalTasks.reduce((acc, t) => acc + t.scheduledDates.length, 0);
+    const done = goalTasks.reduce((acc, t) => acc + t.completedDates.length, 0);
+    return { total, done, taskCount: goalTasks.length, tasks: goalTasks };
+  }
+
+  // Custom type management
+  function addCustomType() {
+    if (!newTypeName.trim()) return;
+    const newType: UserTaskType = {
+      id: `ut_${Date.now()}`,
+      label: newTypeName.trim(),
+      employeeId: currentUser.id,
+    };
+    onUserTaskTypesChange([...userTaskTypes, newType]);
+    setNewTypeName("");
+  }
+
+  function saveTypeEdit(typeId: string) {
+    if (!editingTypeName.trim()) return;
+    onUserTaskTypesChange(
+      userTaskTypes.map((ut) => ut.id === typeId ? { ...ut, label: editingTypeName.trim() } : ut)
+    );
+    setEditingTypeId(null);
+    setEditingTypeName("");
+  }
+
+  function deleteCustomType(typeId: string) {
+    onUserTaskTypesChange(userTaskTypes.filter((ut) => ut.id !== typeId));
+    // Move tasks with this customTypeId to plain variable
+    onTasksChange(
+      tasks.map((t) => t.customTypeId === typeId ? { ...t, customTypeId: undefined } : t)
+    );
   }
 
   function exportExcel() {
-    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks];
+    const customTasks = myCustomTypes.flatMap((ct) =>
+      branchTasks.filter((t) => t.customTypeId === ct.id)
+    );
+    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks, ...customTasks];
     const rows = allTasks.map((t) => {
       const row: Record<string, string> = {
         "Задача": t.title,
-        "Тип": getTaskTypeLabel(t.type),
+        "Тип": getTaskTypeLabel(t.type, t.customTypeId),
         "Категория": getCategory(t.categoryId)?.name || "\u2014",
         "Ответственный": getEmployeeName(t.assigneeId) || "\u2014",
       };
@@ -241,11 +373,14 @@ export default function PlannerPage({
     doc.setFontSize(8);
     doc.text(`${currentUser.name} | ${currentUser.roleLabel}`, 14, 20);
 
-    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks];
+    const customTasksPdf = myCustomTypes.flatMap((ct) =>
+      branchTasks.filter((t) => t.customTypeId === ct.id)
+    );
+    const allTasks = [...permanentTasks, ...variableTasks, ...unplannedTasks, ...customTasksPdf];
     const head = [["Задача", "Тип", "Категория", "Ответственный", ...days.map(String), "План", "Факт"]];
     const body = allTasks.map((t) => [
       t.title,
-      getTaskTypeShort(t.type),
+      getTaskTypeShort(t.type, t.customTypeId),
       getCategory(t.categoryId)?.name || "-",
       getEmployeeName(t.assigneeId) || "-",
       ...days.map((day) => {
@@ -296,6 +431,16 @@ export default function PlannerPage({
               {b.name}
             </button>
           ))}
+          <button
+            onClick={() => setActiveBranchId(NO_BRANCH_ID)}
+            className={`px-4 py-2.5 text-xs font-medium border-b-2 -mb-px transition-colors ${
+              activeBranchId === NO_BRANCH_ID
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Общие
+          </button>
         </div>
 
         <div className="flex items-center gap-2 pb-2">
@@ -366,6 +511,21 @@ export default function PlannerPage({
 
           <div className="relative">
             <button
+              onClick={() => setShowTypeManager(!showTypeManager)}
+              className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-all font-medium ${
+                showTypeManager
+                  ? "bg-accent text-white border-accent"
+                  : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+              }`}
+              title="Настроить типы задач"
+            >
+              <Icon name="Settings" size={12} />
+              Типы
+            </button>
+          </div>
+
+          <div className="relative">
+            <button
               onClick={() => setShowExportMenu(!showExportMenu)}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border border-border text-muted-foreground hover:border-accent hover:text-accent transition-all font-medium"
             >
@@ -398,9 +558,9 @@ export default function PlannerPage({
       </div>
 
       {showToday && todayDay && (
-        <div className="mx-4 md:mx-6 mt-3 border border-accent/20 rounded-lg bg-accent/3 overflow-hidden animate-fade-in flex-shrink-0">
-          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-accent/15">
-            <Icon name="CalendarDays" size={13} className="text-accent" />
+        <div className="mx-4 md:mx-6 mt-3 rounded-lg today-panel overflow-hidden animate-fade-in flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-warning/20">
+            <Icon name="CalendarDays" size={13} className="text-warning" />
             <p className="text-xs font-semibold text-foreground">
               Задачи на сегодня -- {todayDay}{" "}
               {new Date(
@@ -465,7 +625,7 @@ export default function PlannerPage({
                           : "bg-accent/10 text-accent"
                       }`}
                     >
-                      {getTaskTypeShort(t.type)}
+                      {getTaskTypeShort(t.type, t.customTypeId)}
                     </span>
                   </div>
                 );
@@ -474,6 +634,203 @@ export default function PlannerPage({
           )}
         </div>
       )}
+
+      {/* Custom type manager */}
+      {showTypeManager && (
+        <div className="mx-4 md:mx-6 mt-3 border border-border rounded-lg bg-card overflow-hidden animate-fade-in flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border">
+            <Icon name="Settings" size={13} className="text-muted-foreground" />
+            <p className="text-xs font-semibold text-foreground">Пользовательские типы задач</p>
+            <button onClick={() => setShowTypeManager(false)} className="ml-auto text-muted-foreground hover:text-foreground">
+              <Icon name="X" size={14} />
+            </button>
+          </div>
+          <div className="p-3 space-y-2">
+            {myCustomTypes.map((ct) => (
+              <div key={ct.id} className="flex items-center gap-2">
+                {editingTypeId === ct.id ? (
+                  <>
+                    <input
+                      autoFocus
+                      value={editingTypeName}
+                      onChange={(e) => setEditingTypeName(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && saveTypeEdit(ct.id)}
+                      className="flex-1 text-xs border border-accent rounded px-2 py-1 outline-none bg-background"
+                    />
+                    <button onClick={() => saveTypeEdit(ct.id)} className="text-success hover:opacity-80">
+                      <Icon name="Check" size={13} />
+                    </button>
+                    <button onClick={() => setEditingTypeId(null)} className="text-muted-foreground hover:text-foreground">
+                      <Icon name="X" size={13} />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="flex-1 text-xs text-foreground">{ct.label}</span>
+                    <button
+                      onClick={() => { setEditingTypeId(ct.id); setEditingTypeName(ct.label); }}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <Icon name="Pencil" size={11} />
+                    </button>
+                    <button
+                      onClick={() => deleteCustomType(ct.id)}
+                      className="text-muted-foreground hover:text-destructive"
+                    >
+                      <Icon name="Trash2" size={11} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+            {myCustomTypes.length === 0 && (
+              <p className="text-xs text-muted-foreground italic">Нет пользовательских типов</p>
+            )}
+            <div className="flex items-center gap-2 pt-1 border-t border-border">
+              <input
+                value={newTypeName}
+                onChange={(e) => setNewTypeName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && addCustomType()}
+                placeholder="Название нового типа..."
+                className="flex-1 text-xs border border-border rounded px-2 py-1.5 outline-none focus:border-accent bg-background"
+              />
+              <button
+                onClick={addCustomType}
+                className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:opacity-90 font-medium"
+              >
+                Добавить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Personal goals */}
+      <div className="mx-4 md:mx-6 mt-3 flex-shrink-0">
+        <button
+          onClick={() => setShowGoals(!showGoals)}
+          className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors mb-2"
+        >
+          <Icon name={showGoals ? "ChevronDown" : "ChevronRight"} size={13} />
+          <Icon name="Target" size={13} />
+          Мои цели ({myGoals.length})
+        </button>
+
+        {showGoals && (
+          <div className="flex flex-wrap gap-2 mb-1">
+            {myGoals.map((goal) => {
+              const progress = getGoalProgress(goal.id);
+              const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+              const isExpanded = expandedGoalIds.has(goal.id);
+
+              return (
+                <div
+                  key={goal.id}
+                  className="border border-border rounded-lg bg-card overflow-hidden min-w-[200px] max-w-[360px] flex-1"
+                >
+                  <div
+                    className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-muted/20 transition-colors"
+                    onClick={() => {
+                      setExpandedGoalIds((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(goal.id)) next.delete(goal.id); else next.add(goal.id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <Icon name={isExpanded ? "ChevronDown" : "ChevronRight"} size={12} className="text-muted-foreground flex-shrink-0" />
+                    <span className="text-xs font-medium text-foreground truncate flex-1">{goal.title}</span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            pct >= 80 ? "bg-success" : pct >= 40 ? "bg-warning" : "bg-accent"
+                          }`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-mono">{progress.done}/{progress.total}</span>
+                    </div>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deletePersonalGoal(goal.id); }}
+                      className="text-muted-foreground hover:text-destructive flex-shrink-0"
+                    >
+                      <Icon name="Trash2" size={11} />
+                    </button>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="border-t border-border px-3 py-2 space-y-1">
+                      {progress.tasks.length === 0 && (
+                        <p className="text-[10px] text-muted-foreground italic">Нет задач</p>
+                      )}
+                      {progress.tasks.map((t) => {
+                        const totalSch = t.scheduledDates.length;
+                        const totalComp = t.completedDates.length;
+                        return (
+                          <div key={t.id} className="flex items-center gap-1.5 text-[10px]">
+                            <Icon name={totalComp >= totalSch && totalSch > 0 ? "CheckCircle" : "Circle"} size={10}
+                              className={totalComp >= totalSch && totalSch > 0 ? "text-success" : "text-muted-foreground"} />
+                            <span className="truncate flex-1 text-foreground">{t.title}</span>
+                            <span className="text-muted-foreground font-mono">{totalComp}/{totalSch}</span>
+                          </div>
+                        );
+                      })}
+                      {addingGoalTask === goal.id ? (
+                        <div className="flex items-center gap-1.5 pt-1">
+                          <input
+                            autoFocus
+                            value={goalTaskTitle}
+                            onChange={(e) => setGoalTaskTitle(e.target.value)}
+                            onKeyDown={(e) => e.key === "Enter" && addTaskFromGoal(goal.id)}
+                            placeholder="Задача..."
+                            className="flex-1 text-[10px] border border-border rounded px-1.5 py-1 outline-none focus:border-accent bg-background"
+                          />
+                          <button onClick={() => addTaskFromGoal(goal.id)} className="text-success"><Icon name="Check" size={12} /></button>
+                          <button onClick={() => setAddingGoalTask(null)} className="text-muted-foreground"><Icon name="X" size={12} /></button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => { setAddingGoalTask(goal.id); setGoalTaskTitle(""); }}
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent transition-colors pt-1"
+                        >
+                          <Icon name="Plus" size={10} />
+                          Добавить задачу
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {addingGoal ? (
+              <div className="border border-accent/30 rounded-lg bg-card px-3 py-2 min-w-[200px] max-w-[360px] flex-1 animate-fade-in">
+                <input
+                  autoFocus
+                  value={newGoalTitle}
+                  onChange={(e) => setNewGoalTitle(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && addPersonalGoal()}
+                  placeholder="Название цели..."
+                  className="w-full text-xs border border-border rounded px-2 py-1.5 outline-none focus:border-accent bg-background mb-2"
+                />
+                <div className="flex gap-1.5">
+                  <button onClick={addPersonalGoal} className="text-xs bg-accent text-white px-2.5 py-1 rounded hover:opacity-90 font-medium">Создать</button>
+                  <button onClick={() => { setAddingGoal(false); setNewGoalTitle(""); }} className="text-xs text-muted-foreground hover:text-foreground px-2.5 py-1 rounded border border-border">Отмена</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setAddingGoal(true)}
+                className="flex items-center justify-center gap-1.5 border border-dashed border-border rounded-lg px-4 py-3 text-xs text-muted-foreground hover:text-accent hover:border-accent transition-colors min-w-[140px]"
+              >
+                <Icon name="Plus" size={13} />
+                Цель
+              </button>
+            )}
+          </div>
+        )}
+      </div>
 
       <div className="flex-1 overflow-auto px-4 md:px-6 pb-6 pt-3">
         <div className="border border-border rounded-lg overflow-hidden bg-card">
@@ -537,10 +894,10 @@ export default function PlannerPage({
               </thead>
 
               <tbody>
-                <tr className="bg-muted/20">
+                <tr className="section-permanent">
                   <td
                     colSpan={days.length + 3}
-                    className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border"
+                    className="px-4 py-2 text-xs font-semibold text-[hsl(210,100%,42%)] uppercase tracking-wider border-b border-border"
                   >
                     Постоянные задачи
                   </td>
@@ -578,10 +935,10 @@ export default function PlannerPage({
                   </tr>
                 )}
 
-                <tr className="bg-muted/20">
+                <tr className="section-variable">
                   <td
                     colSpan={days.length + 3}
-                    className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border"
+                    className="px-4 py-2 text-xs font-semibold text-[hsl(38,92%,38%)] uppercase tracking-wider border-b border-border"
                   >
                     Переменные задачи
                   </td>
@@ -619,10 +976,10 @@ export default function PlannerPage({
                   </tr>
                 )}
 
-                <tr className="bg-muted/20">
+                <tr className="section-unplanned">
                   <td
                     colSpan={days.length + 3}
-                    className="px-4 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider border-b border-border"
+                    className="px-4 py-2 text-xs font-semibold text-[hsl(0,72%,42%)] uppercase tracking-wider border-b border-border"
                   >
                     Внеплановые задачи
                   </td>
@@ -660,6 +1017,55 @@ export default function PlannerPage({
                   </tr>
                 )}
 
+                {/* Custom type sections */}
+                {myCustomTypes.map((ct) => {
+                  const ctTasks = branchTasks.filter((t) => t.customTypeId === ct.id);
+                  return (
+                    <React.Fragment key={ct.id}>
+                      <tr className="section-custom">
+                        <td
+                          colSpan={days.length + 3}
+                          className="px-4 py-2 text-xs font-semibold text-[hsl(270,60%,45%)] uppercase tracking-wider border-b border-border"
+                        >
+                          {ct.label}
+                        </td>
+                      </tr>
+                      {ctTasks.map((task) => (
+                        <TaskRow
+                          key={task.id}
+                          task={task}
+                          days={days}
+                          currentMonth={currentMonth}
+                          category={getCategory(task.categoryId)}
+                          canEdit={true}
+                          editingTaskId={editingTaskId}
+                          editingTitle={editingTitle}
+                          onEditingTitleChange={setEditingTitle}
+                          onStartEdit={startEdit}
+                          onSaveEdit={saveEdit}
+                          onDelete={deleteTask}
+                          onToggleDate={toggleDate}
+                          getCellState={getCellState}
+                          todayDay={todayDay}
+                          employees={branchEmployees}
+                          assigneeName={getEmployeeName(task.assigneeId)}
+                          onAssigneeChange={updateAssignee}
+                        />
+                      ))}
+                      {ctTasks.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={days.length + 3}
+                            className="px-4 py-3 text-xs text-muted-foreground italic border-b border-border"
+                          >
+                            Нет задач типа "{ct.label}"
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+
                 {addingTask ? (
                   <tr className="border-t border-border">
                     <td
@@ -685,6 +1091,9 @@ export default function PlannerPage({
                           <option value="variable">Переменная</option>
                           <option value="permanent">Постоянная</option>
                           <option value="unplanned">Внеплановая</option>
+                          {myCustomTypes.map((ct) => (
+                            <option key={ct.id} value={ct.id}>{ct.label}</option>
+                          ))}
                         </select>
                       </div>
                     </td>

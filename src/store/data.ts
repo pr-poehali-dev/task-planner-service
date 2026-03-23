@@ -33,7 +33,7 @@ export interface Category {
   color: "high" | "medium" | "low";
 }
 
-export type TaskType = "permanent" | "variable" | "unplanned";
+export type TaskType = "permanent" | "variable" | "unplanned" | string;
 export type TaskStatus = "pending" | "done" | "in-progress";
 
 export interface Task {
@@ -54,6 +54,8 @@ export interface Task {
   rescheduledCount?: number;
   createdByEmployeeId?: string;
   goalTitle?: string;
+  personalGoalId?: string;
+  customTypeId?: string;
 }
 
 export interface GroupGoal {
@@ -74,6 +76,19 @@ export interface GroupTask {
   completedByEmployee?: boolean;
   status?: "in-progress" | "completed" | "rescheduled" | "overdue";
   createdByEmployeeId?: string;
+}
+
+export interface PersonalGoal {
+  id: string;
+  title: string;
+  employeeId: string;
+  monthYear: string;
+}
+
+export interface UserTaskType {
+  id: string;
+  label: string;
+  employeeId: string;
 }
 
 export interface AppState {
@@ -317,6 +332,10 @@ export const MOCK_GROUP_TASKS: GroupTask[] = [
     completedByEmployee: false,
   },
 ];
+
+export const MOCK_PERSONAL_GOALS: PersonalGoal[] = [];
+
+export const MOCK_USER_TASK_TYPES: UserTaskType[] = [];
 
 export function getDaysInMonth(monthYear: string): number[] {
   const [year, month] = monthYear.split("-").map(Number);

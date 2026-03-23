@@ -7,6 +7,8 @@ export interface PersistedData {
   tasks: unknown[];
   groupGoals: unknown[];
   groupTasks: unknown[];
+  personalGoals: unknown[];
+  userTaskTypes: unknown[];
   passwords: Record<string, string>;
   currentUserId: string | null;
 }

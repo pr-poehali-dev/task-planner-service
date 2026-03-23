@@ -157,6 +157,47 @@
     color: hsl(142 70% 32%);
   }
 
+  .section-permanent {
+    background: linear-gradient(
+      90deg,
+      hsl(210 100% 52% / 0.12) 0%,
+      hsl(210 100% 52% / 0.03) 100%
+    );
+    border-left: 3px solid hsl(210 100% 52% / 0.6);
+  }
+  .section-variable {
+    background: linear-gradient(
+      90deg,
+      hsl(38 92% 50% / 0.12) 0%,
+      hsl(38 92% 50% / 0.03) 100%
+    );
+    border-left: 3px solid hsl(38 92% 50% / 0.6);
+  }
+  .section-unplanned {
+    background: linear-gradient(
+      90deg,
+      hsl(0 72% 51% / 0.1) 0%,
+      hsl(0 72% 51% / 0.02) 100%
+    );
+    border-left: 3px solid hsl(0 72% 51% / 0.5);
+  }
+  .section-custom {
+    background: linear-gradient(
+      90deg,
+      hsl(270 60% 55% / 0.1) 0%,
+      hsl(270 60% 55% / 0.02) 100%
+    );
+    border-left: 3px solid hsl(270 60% 55% / 0.5);
+  }
+  .today-panel {
+    background: linear-gradient(
+      135deg,
+      hsl(38 92% 50% / 0.08) 0%,
+      hsl(210 100% 52% / 0.06) 100%
+    );
+    border: 1.5px solid hsl(38 92% 50% / 0.35);
+  }
+
   /* Mobile touch scroll for planner table */
   .planner-table-wrap {
     -webkit-overflow-scrolling: touch;

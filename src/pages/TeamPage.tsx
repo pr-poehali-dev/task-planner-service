@@ -219,7 +219,13 @@ export default function TeamPage({
               <div key={goal.id} className="border border-border rounded-lg overflow-hidden bg-card">
                 {/* Goal header */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20 transition-colors"
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-muted/20 transition-colors ${
+                    progress >= 80
+                      ? "border-l-[3px] border-l-success"
+                      : progress >= 40
+                      ? "border-l-[3px] border-l-warning"
+                      : "border-l-[3px] border-l-accent"
+                  }`}
                   onClick={() => toggleGoal(goal.id)}
                 >
                   <Icon
