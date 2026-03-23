@@ -11,9 +11,11 @@ interface Props {
   branches: Branch[];
   employees: Employee[];
   categories: Category[];
+  passwords: Record<string, string>;
   onBranchesChange: (b: Branch[]) => void;
   onEmployeesChange: (e: Employee[]) => void;
   onCategoriesChange: (c: Category[]) => void;
+  onPasswordChange: (empId: string, password: string) => void;
 }
 
 type ManagementTab = "employees" | "branches" | "categories" | "roles";
@@ -23,9 +25,11 @@ export default function ManagementPage({
   branches,
   employees,
   categories,
+  passwords,
   onBranchesChange,
   onEmployeesChange,
   onCategoriesChange,
+  onPasswordChange,
 }: Props) {
   const [activeTab, setActiveTab] = useState<ManagementTab>("employees");
   const isDirector = currentUser.role === "director";
@@ -83,7 +87,12 @@ export default function ManagementPage({
           />
         )}
         {activeTab === "roles" && isDirector && (
-          <RolesTab employees={employees} onEmployeesChange={onEmployeesChange} />
+          <RolesTab
+            employees={employees}
+            passwords={passwords}
+            onEmployeesChange={onEmployeesChange}
+            onPasswordChange={onPasswordChange}
+          />
         )}
       </div>
     </div>
@@ -406,10 +415,13 @@ function CategoriesTab({
 
 function RolesTab({
   employees,
-  onEmployeesChange,
+  passwords,
+  onPasswordChange,
 }: {
   employees: Employee[];
+  passwords: Record<string, string>;
   onEmployeesChange: (e: Employee[]) => void;
+  onPasswordChange: (empId: string, password: string) => void;
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -466,6 +478,9 @@ function RolesTab({
                       />
                       <button
                         onClick={() => {
+                          if (newPassword.trim()) {
+                            onPasswordChange(emp.id, newPassword.trim());
+                          }
                           setEditingId(null);
                           setNewPassword("");
                         }}

@@ -1,10 +1,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
-import {
-  MOCK_EMPLOYEES,
-  formatMonthYear,
-  type Employee,
-} from "@/store/data";
+import { formatMonthYear, type Employee } from "@/store/data";
 
 interface NavItem {
   id: string;
@@ -26,6 +22,7 @@ interface LayoutProps {
   currentUser: Employee;
   currentMonth: string;
   onMonthChange: (month: string) => void;
+  onLogout: () => void;
   children: React.ReactNode;
 }
 
@@ -35,6 +32,7 @@ export default function Layout({
   currentUser,
   currentMonth,
   onMonthChange,
+  onLogout,
   children,
 }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -97,19 +95,38 @@ export default function Layout({
           ))}
         </nav>
 
-        {/* User */}
-        <div className="p-3 border-t border-sidebar-border">
-          <div className={`flex items-center gap-2.5 px-2 py-2 rounded ${collapsed ? "justify-center" : ""}`}>
+        {/* User + logout */}
+        <div className="p-3 border-t border-sidebar-border space-y-1">
+          <button
+            onClick={() => onNavigate("profile")}
+            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded hover:bg-sidebar-accent/40 transition-colors ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
             <div className="w-7 h-7 rounded-full bg-accent/20 flex items-center justify-center flex-shrink-0 text-accent text-xs font-semibold">
               {initials}
             </div>
             {!collapsed && (
-              <div className="overflow-hidden">
-                <p className="text-sidebar-primary text-xs font-medium truncate">{currentUser.name}</p>
-                <p className="text-sidebar-foreground text-xs truncate opacity-60">{currentUser.roleLabel}</p>
+              <div className="overflow-hidden flex-1 text-left">
+                <p className="text-sidebar-primary text-xs font-medium truncate">
+                  {currentUser.name}
+                </p>
+                <p className="text-sidebar-foreground text-xs truncate opacity-60">
+                  {currentUser.roleLabel}
+                </p>
               </div>
             )}
-          </div>
+          </button>
+
+          <button
+            onClick={onLogout}
+            className={`w-full flex items-center gap-2.5 px-2 py-2 rounded text-sidebar-foreground hover:bg-destructive/10 hover:text-red-400 transition-colors ${
+              collapsed ? "justify-center" : ""
+            }`}
+          >
+            <Icon name="LogOut" size={14} className="flex-shrink-0" />
+            {!collapsed && <span className="text-xs">Выйти</span>}
+          </button>
         </div>
       </aside>
 
@@ -117,11 +134,9 @@ export default function Layout({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Topbar */}
         <header className="h-14 border-b border-border flex items-center px-6 gap-4 bg-card flex-shrink-0">
-          <div>
-            <h1 className="font-semibold text-sm text-foreground">
-              {NAV_ITEMS.find((n) => n.id === activePage)?.label}
-            </h1>
-          </div>
+          <h1 className="font-semibold text-sm text-foreground">
+            {NAV_ITEMS.find((n) => n.id === activePage)?.label}
+          </h1>
 
           {(activePage === "planner" || activePage === "team") && (
             <div className="flex items-center gap-2 ml-auto">
@@ -143,9 +158,7 @@ export default function Layout({
             </div>
           )}
 
-          {activePage !== "planner" && activePage !== "team" && (
-            <div className="ml-auto" />
-          )}
+          {activePage !== "planner" && activePage !== "team" && <div className="ml-auto" />}
 
           <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted px-2.5 py-1.5 rounded-full">
             <div className="w-1.5 h-1.5 rounded-full bg-success" />
@@ -154,9 +167,7 @@ export default function Layout({
         </header>
 
         {/* Content */}
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>
   );

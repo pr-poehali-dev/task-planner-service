@@ -72,6 +72,16 @@ export interface AppState {
   selectedBranchId: string | null;
 }
 
+// ─── Passwords ─────────────────────────────────────────────────────────────
+// Хранятся как обычный объект { employeeId: password }
+// В реальном проекте пароли должны быть в бэкенде!
+export const EMPLOYEE_PASSWORDS: Record<string, string> = {
+  e1: "director123",
+  e2: "manager123",
+  e3: "marketer123",
+  e4: "manager123",
+};
+
 // ─── Mock Data ─────────────────────────────────────────────────────────────
 
 export const MOCK_BRANCHES: Branch[] = [
