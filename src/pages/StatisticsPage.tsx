@@ -52,9 +52,9 @@ export default function StatisticsPage({
     v >= 75 ? "text-success" : v >= 50 ? "text-warning" : "text-destructive";
 
   return (
-    <div className="p-6 space-y-6 animate-fade-in">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6 animate-fade-in">
       {/* Summary cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <StatCard
           title="Задач запланировано"
           value={totalScheduled}
@@ -96,7 +96,8 @@ export default function StatisticsPage({
                 <span className="text-xs text-muted-foreground">{branch.city}</span>
               </div>
 
-              <table className="w-full">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[600px]">
                 <thead>
                   <tr className="border-b border-border bg-muted/10">
                     <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Сотрудник</th>
@@ -168,6 +169,7 @@ export default function StatisticsPage({
                   )}
                 </tbody>
               </table>
+              </div>
             </div>
           );
         })}

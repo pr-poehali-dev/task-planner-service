@@ -94,6 +94,7 @@ export const MOCK_CATEGORIES: Category[] = [
   { id: "c1", name: "Срочно", color: "high" },
   { id: "c2", name: "Важно", color: "medium" },
   { id: "c3", name: "Плановое", color: "low" },
+  { id: "c4", name: "Внеплановые", color: "high" },
 ];
 
 export const MOCK_EMPLOYEES: Employee[] = [

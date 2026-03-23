@@ -44,13 +44,13 @@ export default function ManagementPage({
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Tabs */}
-      <div className="px-6 pt-5 pb-0 border-b border-border flex-shrink-0">
-        <div className="flex gap-1">
+      <div className="px-4 md:px-6 pt-4 md:pt-5 pb-0 border-b border-border flex-shrink-0 overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-3 md:px-4 py-2.5 text-xs font-medium border-b-2 transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? "border-accent text-accent"
                   : "border-transparent text-muted-foreground hover:text-foreground"
@@ -63,7 +63,7 @@ export default function ManagementPage({
         </div>
       </div>
 
-      <div className="flex-1 overflow-auto p-6">
+      <div className="flex-1 overflow-auto p-4 md:p-6">
         {activeTab === "employees" && (
           <EmployeesTab
             employees={employees}
@@ -101,6 +101,13 @@ export default function ManagementPage({
 
 // ─── Employees ──────────────────────────────────────────────────────────────
 
+const PRESET_ROLES = [
+  { value: "director", label: "Директор" },
+  { value: "manager", label: "Управляющий" },
+  { value: "marketer", label: "Маркетолог" },
+  { value: "custom", label: "Другое" },
+];
+
 function EmployeesTab({
   employees,
   branches,
@@ -113,21 +120,28 @@ function EmployeesTab({
   isDirector: boolean;
 }) {
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", roleLabel: "", branchIds: [] as string[] });
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    role: "custom" as string,
+    roleLabel: "",
+    branchIds: [] as string[],
+  });
+  const [editingBranchesId, setEditingBranchesId] = useState<string | null>(null);
 
   function saveNew() {
     if (!form.name.trim()) return;
+    const preset = PRESET_ROLES.find((r) => r.value === form.role);
     const emp: Employee = {
       id: `e_${Date.now()}`,
-      name: form.name,
-      email: form.email,
-      roleLabel: form.roleLabel || "Сотрудник",
-      role: "custom",
+      name: form.name.trim(),
+      email: form.email.trim(),
+      roleLabel: form.role === "custom" ? (form.roleLabel || "Сотрудник") : (preset?.label || "Сотрудник"),
+      role: form.role,
       branchIds: form.branchIds,
     };
     onEmployeesChange([...employees, emp]);
-    setForm({ name: "", email: "", roleLabel: "", branchIds: [] });
+    setForm({ name: "", email: "", role: "custom", roleLabel: "", branchIds: [] });
     setAdding(false);
   }
 
@@ -135,16 +149,27 @@ function EmployeesTab({
     onEmployeesChange(employees.filter((e) => e.id !== id));
   }
 
-  function toggleBranch(branchId: string, checked: boolean, empId: string) {
+  function toggleBranchForEmp(branchId: string, checked: boolean, empId: string) {
     onEmployeesChange(
       employees.map((e) =>
-        e.id !== empId ? e : {
-          ...e,
-          branchIds: checked ? [...e.branchIds, branchId] : e.branchIds.filter((b) => b !== branchId),
-        }
+        e.id !== empId
+          ? e
+          : {
+              ...e,
+              branchIds: checked
+                ? [...e.branchIds, branchId]
+                : e.branchIds.filter((b) => b !== branchId),
+            }
       )
     );
   }
+
+  const roleColors: Record<string, string> = {
+    director: "bg-destructive/10 text-destructive",
+    manager: "bg-accent/10 text-accent",
+    marketer: "bg-success/10 text-success",
+    custom: "bg-muted text-muted-foreground",
+  };
 
   return (
     <div className="space-y-4">
@@ -162,8 +187,8 @@ function EmployeesTab({
       </div>
 
       {adding && (
-        <div className="border border-accent/30 rounded-lg p-4 bg-accent/3 space-y-2 animate-fade-in">
-          <p className="text-xs font-medium text-foreground mb-3">Новый сотрудник</p>
+        <div className="border border-accent/30 rounded-lg p-4 bg-accent/3 space-y-3 animate-fade-in">
+          <p className="text-xs font-semibold text-foreground">Новый сотрудник</p>
           <div className="grid grid-cols-2 gap-2">
             <input
               autoFocus
@@ -178,15 +203,29 @@ function EmployeesTab({
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
               className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
             />
-            <input
-              placeholder="Должность"
-              value={form.roleLabel}
-              onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
+            <select
+              value={form.role}
+              onChange={(e) => setForm((p) => ({ ...p, role: e.target.value, roleLabel: "" }))}
               className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
-            />
-            <div className="flex flex-wrap gap-1.5 items-center">
+            >
+              {PRESET_ROLES.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+            {form.role === "custom" && (
+              <input
+                placeholder="Название должности"
+                value={form.roleLabel}
+                onChange={(e) => setForm((p) => ({ ...p, roleLabel: e.target.value }))}
+                className="text-xs border border-border rounded px-2.5 py-1.5 outline-none focus:border-accent bg-background"
+              />
+            )}
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground mb-1.5">Филиалы</p>
+            <div className="flex flex-wrap gap-2">
               {branches.map((b) => (
-                <label key={b.id} className="flex items-center gap-1 text-xs cursor-pointer">
+                <label key={b.id} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={form.branchIds.includes(b.id)}
@@ -205,66 +244,109 @@ function EmployeesTab({
               ))}
             </div>
           </div>
-          <div className="flex gap-2 mt-2">
-            <button onClick={saveNew} className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:opacity-90 font-medium">Сохранить</button>
-            <button onClick={() => setAdding(false)} className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded border border-border">Отмена</button>
+          <div className="flex gap-2">
+            <button onClick={saveNew} className="text-xs bg-accent text-white px-3 py-1.5 rounded hover:opacity-90 font-medium">
+              Сохранить
+            </button>
+            <button
+              onClick={() => setAdding(false)}
+              className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded border border-border"
+            >
+              Отмена
+            </button>
           </div>
         </div>
       )}
 
-      <div className="border border-border rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-muted/40 border-b border-border">
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Сотрудник</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Должность</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Филиалы</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Email</th>
-              {isDirector && <th className="w-16" />}
-            </tr>
-          </thead>
-          <tbody>
-            {employees.map((emp) => (
-              <tr key={emp.id} className="border-b border-border last:border-b-0 hover:bg-muted/10 group transition-colors">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                      {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
-                    </div>
+      <div className="space-y-2">
+        {employees.map((emp) => {
+          const isEditingBranches = editingBranchesId === emp.id;
+          return (
+            <div
+              key={emp.id}
+              className="border border-border rounded-lg bg-card overflow-hidden group hover:border-border transition-colors"
+            >
+              <div className="flex items-center gap-3 px-4 py-3">
+                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary flex-shrink-0">
+                  {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium text-foreground">{emp.name}</span>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${roleColors[emp.role] || roleColors.custom}`}>
+                      {emp.roleLabel}
+                    </span>
                   </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">{emp.roleLabel}</span>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex flex-wrap gap-1">
-                    {branches
-                      .filter((b) => emp.branchIds.includes(b.id))
-                      .map((b) => (
-                        <span key={b.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">
-                          {b.name}
-                        </span>
-                      ))}
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className="text-xs text-muted-foreground">{emp.email}</span>
-                </td>
-                {isDirector && (
-                  <td className="px-4 py-3 text-right">
+                  <p className="text-xs text-muted-foreground mt-0.5">{emp.email}</p>
+                </div>
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {isDirector && (
+                    <button
+                      onClick={() => setEditingBranchesId(isEditingBranches ? null : emp.id)}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded border transition-colors ${
+                        isEditingBranches
+                          ? "border-accent text-accent bg-accent/5"
+                          : "border-border text-muted-foreground hover:border-accent hover:text-accent"
+                      }`}
+                    >
+                      <Icon name="MapPin" size={11} />
+                      Филиалы
+                    </button>
+                  )}
+                  {isDirector && (
                     <button
                       onClick={() => deleteEmployee(emp.id)}
-                      className="hidden group-hover:flex items-center text-muted-foreground hover:text-destructive transition-colors"
+                      className="hidden group-hover:flex p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded"
                     >
-                      <Icon name="Trash2" size={14} />
+                      <Icon name="Trash2" size={13} />
                     </button>
-                  </td>
+                  )}
+                </div>
+              </div>
+
+              {/* Branch chips always visible */}
+              <div className="px-4 pb-3 flex flex-wrap gap-1.5">
+                {branches
+                  .filter((b) => emp.branchIds.includes(b.id))
+                  .map((b) => (
+                    <span key={b.id} className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full">
+                      {b.name}
+                    </span>
+                  ))}
+                {emp.branchIds.length === 0 && (
+                  <span className="text-xs text-muted-foreground italic">Нет филиалов</span>
                 )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+
+              {/* Branch edit panel */}
+              {isEditingBranches && (
+                <div className="border-t border-border bg-muted/20 px-4 py-3 animate-fade-in">
+                  <p className="text-xs font-medium text-foreground mb-2">Редактировать филиалы</p>
+                  <div className="flex flex-wrap gap-3">
+                    {branches.map((b) => (
+                      <label key={b.id} className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={emp.branchIds.includes(b.id)}
+                          onChange={(e) => toggleBranchForEmp(b.id, e.target.checked, emp.id)}
+                          className="rounded border-border"
+                        />
+                        <span className="text-foreground">{b.name}</span>
+                        <span className="text-muted-foreground">({b.city})</span>
+                      </label>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setEditingBranchesId(null)}
+                    className="mt-2 text-xs text-accent hover:opacity-80"
+                  >
+                    Готово
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

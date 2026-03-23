@@ -155,4 +155,10 @@
     background: hsl(142 70% 45% / 0.1);
     color: hsl(142 70% 32%);
   }
+
+  /* Mobile touch scroll for planner table */
+  .planner-table-wrap {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+  }
 }

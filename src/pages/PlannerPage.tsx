@@ -146,7 +146,7 @@ export default function PlannerPage({
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Top row: branch tabs + controls */}
-      <div className="px-6 pt-5 pb-0 flex items-end justify-between gap-4 flex-shrink-0 border-b border-border">
+      <div className="px-4 md:px-6 pt-4 md:pt-5 pb-0 flex items-end justify-between gap-2 md:gap-4 flex-shrink-0 border-b border-border flex-wrap">
         <div className="flex gap-1">
           {userBranches.map((b) => (
             <button
@@ -285,7 +285,7 @@ export default function PlannerPage({
       )}
 
       {/* Table */}
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-3">
+      <div className="flex-1 overflow-auto px-4 md:px-6 pb-6 pt-3">
         <div className="border border-border rounded-lg overflow-hidden bg-card">
           <div className="overflow-x-auto">
             <table

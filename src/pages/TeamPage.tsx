@@ -146,7 +146,7 @@ export default function TeamPage({
   return (
     <div className="h-full flex flex-col animate-fade-in">
       {/* Branch tabs */}
-      <div className="px-6 pt-5 pb-0 flex items-center gap-1 flex-shrink-0 border-b border-border">
+      <div className="px-4 md:px-6 pt-4 md:pt-5 pb-0 flex items-center gap-1 flex-shrink-0 border-b border-border overflow-x-auto">
         {branches.map((b) => (
           <button
             key={b.id}
@@ -163,7 +163,7 @@ export default function TeamPage({
       </div>
 
       {/* Goals list */}
-      <div className="flex-1 overflow-auto px-6 pb-6 pt-4">
+      <div className="flex-1 overflow-auto px-4 md:px-6 pb-6 pt-4">
         <div className="space-y-3">
           {branchGoals.map((goal) => {
             const stats = getGoalStats(goal.id);
@@ -241,8 +241,8 @@ export default function TeamPage({
 
                 {/* Tasks table */}
                 {isExpanded && (
-                  <div className="border-t border-border">
-                    <table className="w-full">
+                  <div className="border-t border-border overflow-x-auto">
+                    <table className="w-full min-w-[500px]">
                       <thead>
                         <tr className="border-b border-border bg-muted/30">
                           <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2">
