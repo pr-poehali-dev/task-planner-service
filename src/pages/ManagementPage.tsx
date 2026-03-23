@@ -5,6 +5,7 @@ import {
   type Branch,
   type Category,
   type Task,
+  DEFAULT_PERMISSIONS,
   getDaysInMonth,
 } from "@/store/data";
 
@@ -521,6 +522,7 @@ function CategoriesTab({
 function RolesTab({
   employees,
   passwords,
+  onEmployeesChange,
   onPasswordChange,
 }: {
   employees: Employee[];
@@ -538,84 +540,149 @@ function RolesTab({
     custom: "bg-muted text-muted-foreground",
   };
 
+  function getPerms(emp: Employee) {
+    if (emp.role === "director") return { canViewTeamPlanner: true, canManageTeamGoals: true };
+    return emp.permissions || DEFAULT_PERMISSIONS;
+  }
+
+  function togglePermission(empId: string, key: "canViewTeamPlanner" | "canManageTeamGoals") {
+    onEmployeesChange(
+      employees.map((e) => {
+        if (e.id !== empId || e.role === "director") return e;
+        const current = e.permissions || DEFAULT_PERMISSIONS;
+        const updated = { ...current, [key]: !current[key] };
+        if (!updated.canViewTeamPlanner) {
+          updated.canManageTeamGoals = false;
+        }
+        return { ...e, permissions: updated };
+      })
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6">
+      <div>
         <h2 className="text-sm font-semibold text-foreground">Управление доступом</h2>
+        <p className="text-xs text-muted-foreground mt-1">Пароли и права видимости для каждого сотрудника</p>
       </div>
 
-      <div className="border border-border rounded-lg overflow-hidden">
-        <table className="w-full">
+      <div className="border border-border rounded-lg overflow-hidden overflow-x-auto">
+        <table className="w-full min-w-[700px]">
           <thead>
             <tr className="bg-muted/40 border-b border-border">
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Сотрудник</th>
               <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Роль</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Пароль входа</th>
-              <th className="w-24" />
+              <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2.5 w-32">Командный планер</th>
+              <th className="text-center text-xs font-medium text-muted-foreground px-3 py-2.5 w-32">Управление целями</th>
+              <th className="text-left text-xs font-medium text-muted-foreground px-4 py-2.5">Пароль</th>
+              <th className="w-20" />
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp) => (
-              <tr key={emp.id} className="border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors group">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-foreground">
-                      {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+            {employees.map((emp) => {
+              const perms = getPerms(emp);
+              const isDir = emp.role === "director";
+              return (
+                <tr key={emp.id} className="border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors group">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-foreground">
+                        {emp.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      </div>
+                      <span className="text-sm text-foreground">{emp.name}</span>
                     </div>
-                    <span className="text-sm text-foreground">{emp.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${roleColors[emp.role] || roleColors.custom}`}>
-                    {emp.roleLabel}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  {editingId === emp.id ? (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="password"
-                        autoFocus
-                        placeholder="Новый пароль"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        className="text-xs border border-border rounded px-2 py-1 outline-none focus:border-accent bg-background w-32"
-                      />
-                      <button
-                        onClick={() => {
-                          if (newPassword.trim()) {
-                            onPasswordChange(emp.id, newPassword.trim());
-                          }
-                          setEditingId(null);
-                          setNewPassword("");
-                        }}
-                        className="text-success hover:opacity-80"
-                      >
-                        <Icon name="Check" size={13} />
-                      </button>
-                      <button onClick={() => setEditingId(null)} className="text-muted-foreground hover:text-destructive">
-                        <Icon name="X" size={13} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="text-xs text-muted-foreground font-mono">••••••••</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  {editingId !== emp.id && (
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${roleColors[emp.role] || roleColors.custom}`}>
+                      {emp.roleLabel}
+                    </span>
+                  </td>
+                  <td className="px-3 py-3 text-center">
                     <button
-                      onClick={() => setEditingId(emp.id)}
-                      className="hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => togglePermission(emp.id, "canViewTeamPlanner")}
+                      disabled={isDir}
+                      className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center ${
+                        perms.canViewTeamPlanner ? "bg-success" : "bg-border"
+                      } ${isDir ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
                     >
-                      <Icon name="KeyRound" size={12} />
-                      Сменить
+                      <span className={`w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${
+                        perms.canViewTeamPlanner ? "translate-x-[18px]" : "translate-x-[3px]"
+                      }`} />
                     </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-3 py-3 text-center">
+                    <button
+                      onClick={() => togglePermission(emp.id, "canManageTeamGoals")}
+                      disabled={isDir || !perms.canViewTeamPlanner}
+                      className={`w-9 h-5 rounded-full transition-colors relative inline-flex items-center ${
+                        perms.canManageTeamGoals ? "bg-success" : "bg-border"
+                      } ${isDir || !perms.canViewTeamPlanner ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                    >
+                      <span className={`w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${
+                        perms.canManageTeamGoals ? "translate-x-[18px]" : "translate-x-[3px]"
+                      }`} />
+                    </button>
+                  </td>
+                  <td className="px-4 py-3">
+                    {editingId === emp.id ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="password"
+                          autoFocus
+                          placeholder="Новый пароль"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="text-xs border border-border rounded px-2 py-1 outline-none focus:border-accent bg-background w-28"
+                        />
+                        <button
+                          onClick={() => {
+                            if (newPassword.trim()) {
+                              onPasswordChange(emp.id, newPassword.trim());
+                            }
+                            setEditingId(null);
+                            setNewPassword("");
+                          }}
+                          className="text-success hover:opacity-80"
+                        >
+                          <Icon name="Check" size={13} />
+                        </button>
+                        <button onClick={() => setEditingId(null)} className="text-muted-foreground hover:text-destructive">
+                          <Icon name="X" size={13} />
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-muted-foreground font-mono">••••••••</span>
+                    )}
+                  </td>
+                  <td className="px-3 py-3 text-right">
+                    {editingId !== emp.id && (
+                      <button
+                        onClick={() => setEditingId(emp.id)}
+                        className="hidden group-hover:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                      >
+                        <Icon name="KeyRound" size={12} />
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+      </div>
+
+      <div className="bg-muted/30 rounded-lg p-4 space-y-2">
+        <p className="text-xs font-medium text-foreground">Описание прав</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div className="flex items-start gap-2">
+            <Icon name="Users" size={12} className="mt-0.5 flex-shrink-0" />
+            <span><strong>Командный планер</strong> — видит раздел «Командный» с целями и задачами команды</span>
+          </div>
+          <div className="flex items-start gap-2">
+            <Icon name="Target" size={12} className="mt-0.5 flex-shrink-0" />
+            <span><strong>Управление целями</strong> — может создавать цели и назначать командные задачи</span>
+          </div>
+        </div>
       </div>
     </div>
   );

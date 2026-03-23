@@ -14,6 +14,7 @@ import {
   MOCK_GROUP_GOALS,
   MOCK_GROUP_TASKS,
   EMPLOYEE_PASSWORDS,
+  DEFAULT_PERMISSIONS,
   type Branch,
   type Employee,
   type Category,
@@ -206,7 +207,7 @@ export default function Index() {
           currentMonth={currentMonth}
         />
       )}
-      {activePage === "team" && (
+      {activePage === "team" && (isDirector || (currentUser.permissions || DEFAULT_PERMISSIONS).canViewTeamPlanner) && (
         <TeamPage
           currentUser={currentUser}
           branches={isDirector ? branches : visibleBranches}

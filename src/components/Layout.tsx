@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Icon from "@/components/ui/icon";
-import { formatMonthYear, type Employee } from "@/store/data";
+import { formatMonthYear, DEFAULT_PERMISSIONS, type Employee } from "@/store/data";
 
 interface NavItem {
   id: string;
@@ -8,7 +8,7 @@ interface NavItem {
   icon: string;
 }
 
-const NAV_ITEMS: NavItem[] = [
+const ALL_NAV_ITEMS: NavItem[] = [
   { id: "planner", label: "Мой планер", icon: "LayoutGrid" },
   { id: "team", label: "Командный", icon: "Users" },
   { id: "management", label: "Управление", icon: "Settings2" },
@@ -37,6 +37,17 @@ export default function Layout({
 }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const perms = currentUser.role === "director"
+    ? { canViewTeamPlanner: true, canManageTeamGoals: true }
+    : currentUser.permissions || DEFAULT_PERMISSIONS;
+
+  const NAV_ITEMS = useMemo(() => {
+    return ALL_NAV_ITEMS.filter((item) => {
+      if (item.id === "team" && !perms.canViewTeamPlanner) return false;
+      return true;
+    });
+  }, [perms.canViewTeamPlanner]);
 
   function prevMonth() {
     const [y, m] = currentMonth.split("-").map(Number);

@@ -6,6 +6,16 @@ export interface Branch {
   city: string;
 }
 
+export interface EmployeePermissions {
+  canViewTeamPlanner: boolean;
+  canManageTeamGoals: boolean;
+}
+
+export const DEFAULT_PERMISSIONS: EmployeePermissions = {
+  canViewTeamPlanner: true,
+  canManageTeamGoals: false,
+};
+
 export interface Employee {
   id: string;
   name: string;
@@ -14,6 +24,7 @@ export interface Employee {
   branchIds: string[];
   avatar?: string;
   email: string;
+  permissions?: EmployeePermissions;
 }
 
 export interface Category {

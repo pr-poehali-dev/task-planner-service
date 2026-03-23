@@ -7,6 +7,7 @@ import {
   type GroupGoal,
   type GroupTask,
   type Task,
+  DEFAULT_PERMISSIONS,
 } from "@/store/data";
 
 interface Props {
@@ -180,7 +181,10 @@ export default function TeamPage({
   }
 
   const isDirector = currentUser.role === "director";
-  const isManager = currentUser.role === "manager" || isDirector;
+  const perms = isDirector
+    ? { canViewTeamPlanner: true, canManageTeamGoals: true }
+    : currentUser.permissions || DEFAULT_PERMISSIONS;
+  const canManageGoals = perms.canManageTeamGoals;
 
   return (
     <div className="h-full flex flex-col animate-fade-in">
@@ -249,7 +253,7 @@ export default function TeamPage({
                         {stats.done}/{stats.total}
                       </span>
                     </div>
-                    {isManager && (
+                    {canManageGoals && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -489,7 +493,7 @@ export default function TeamPage({
           })}
 
           {/* Add goal */}
-          {isDirector &&
+          {canManageGoals &&
             (addingGoal ? (
               <div className="border border-accent/30 rounded-lg px-4 py-3 bg-card animate-fade-in">
                 <p className="text-xs font-medium text-foreground mb-2">Новая цель</p>
@@ -545,9 +549,9 @@ export default function TeamPage({
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <Icon name="Target" size={32} className="text-muted-foreground/30 mb-3" />
               <p className="text-sm text-muted-foreground">Нет целей для этого филиала</p>
-              {isDirector && (
+              {canManageGoals && (
                 <p className="text-xs text-muted-foreground/60 mt-1">
-                  Нажмите "Добавить цель" чтобы начать
+                  Нажмите «Добавить цель» чтобы начать
                 </p>
               )}
             </div>
