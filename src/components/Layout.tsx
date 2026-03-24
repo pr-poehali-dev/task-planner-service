@@ -1,7 +1,6 @@
 import { useState, useMemo } from "react";
 import Icon from "@/components/ui/icon";
 import { formatMonthYear, DEFAULT_PERMISSIONS, type Employee } from "@/store/data";
-import { type ProjectInfo } from "@/store/persist";
 
 interface NavItem {
   id: string;
@@ -26,7 +25,6 @@ interface LayoutProps {
   currentMonth: string;
   onMonthChange: (month: string) => void;
   onLogout: () => void;
-  projectInfo?: ProjectInfo | null;
   children: React.ReactNode;
 }
 
@@ -37,7 +35,6 @@ export default function Layout({
   currentMonth,
   onMonthChange,
   onLogout,
-  projectInfo,
   children,
 }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
@@ -84,18 +81,13 @@ export default function Layout({
             <Icon name="Zap" size={14} className="text-white" />
           </div>
           {!collapsed && (
-            <div className="flex-1 min-w-0">
-              <span className="font-semibold text-sidebar-primary text-sm tracking-tight block truncate">
-                {projectInfo?.name || "Планер"}
-              </span>
-              {projectInfo && (
-                <span className="text-[10px] text-sidebar-foreground/60 font-mono">{projectInfo.inviteCode}</span>
-              )}
-            </div>
+            <span className="font-semibold text-sidebar-primary text-sm tracking-tight">
+              Планер
+            </span>
           )}
           <button
             onClick={() => setCollapsed(!collapsed)}
-            className="ml-auto text-sidebar-foreground hover:text-sidebar-primary transition-colors flex-shrink-0"
+            className="ml-auto text-sidebar-foreground hover:text-sidebar-primary transition-colors"
           >
             <Icon name={collapsed ? "ChevronRight" : "ChevronLeft"} size={14} />
           </button>
@@ -230,15 +222,10 @@ export default function Layout({
               <div className="w-7 h-7 rounded bg-accent flex items-center justify-center">
                 <Icon name="Zap" size={14} className="text-white" />
               </div>
-              <div className="flex-1 min-w-0">
-                <span className="font-semibold text-sidebar-primary text-sm block truncate">{projectInfo?.name || "Планер"}</span>
-                {projectInfo && (
-                  <span className="text-[10px] text-sidebar-foreground/60 font-mono">{projectInfo.inviteCode}</span>
-                )}
-              </div>
+              <span className="font-semibold text-sidebar-primary text-sm">Планер</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="ml-auto text-sidebar-foreground hover:text-sidebar-primary flex-shrink-0"
+                className="ml-auto text-sidebar-foreground hover:text-sidebar-primary"
               >
                 <Icon name="X" size={16} />
               </button>
