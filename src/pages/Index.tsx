@@ -420,6 +420,7 @@ export default function Index() {
       )}
       {activePage === "management" && isDirector && (
         <ManagementPage
+          currentUser={currentUser}
           branches={branches}
           employees={employees}
           categories={categories}
@@ -428,6 +429,9 @@ export default function Index() {
           onCategoriesChange={setCategories}
           passwords={passwords}
           onPasswordChange={handlePasswordChange}
+          tasks={tasks}
+          onTasksChange={handleTasksChange}
+          currentMonth={currentMonth}
         />
       )}
       {activePage === "statistics" && (
@@ -447,6 +451,7 @@ export default function Index() {
           currentUser={currentUser}
           notes={notes}
           onNotesChange={setNotes}
+          employees={employees}
         />
       )}
       {activePage === "files" && (
