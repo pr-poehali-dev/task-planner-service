@@ -1,4 +1,11 @@
 const STORAGE_KEY = "planner_app_data";
+const PROJECT_KEY = "planner_project_info";
+
+export interface ProjectInfo {
+  projectId: string;
+  name: string;
+  inviteCode: string;
+}
 
 export interface PersistedData {
   branches: unknown[];
@@ -36,6 +43,32 @@ export function saveToStorage(data: PersistedData): void {
 export function clearStorage(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
+export function loadProjectInfo(): ProjectInfo | null {
+  try {
+    const raw = localStorage.getItem(PROJECT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as ProjectInfo;
+  } catch {
+    return null;
+  }
+}
+
+export function saveProjectInfo(info: ProjectInfo): void {
+  try {
+    localStorage.setItem(PROJECT_KEY, JSON.stringify(info));
+  } catch {
+    // Ignore
+  }
+}
+
+export function clearProjectInfo(): void {
+  try {
+    localStorage.removeItem(PROJECT_KEY);
   } catch {
     // Ignore
   }

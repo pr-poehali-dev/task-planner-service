@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Icon from "@/components/ui/icon";
 import { type Employee, type Branch } from "@/store/data";
+import { type ProjectInfo } from "@/store/persist";
 
 interface Props {
   currentUser: Employee;
@@ -8,11 +9,13 @@ interface Props {
   employees: Employee[];
   onUserChange: (user: Employee) => void;
   onNavigate: (page: string) => void;
+  projectInfo?: ProjectInfo | null;
 }
 
-export default function ProfilePage({ currentUser, branches, employees, onUserChange, onNavigate }: Props) {
+export default function ProfilePage({ currentUser, branches, employees, onUserChange, onNavigate, projectInfo }: Props) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({ name: currentUser.name, email: currentUser.email });
+  const [codeCopied, setCodeCopied] = useState(false);
 
   function startEdit() {
     setForm({ name: currentUser.name, email: currentUser.email });
@@ -25,11 +28,44 @@ export default function ProfilePage({ currentUser, branches, employees, onUserCh
     setEditing(false);
   }
 
+  function copyCode() {
+    if (!projectInfo) return;
+    navigator.clipboard.writeText(projectInfo.inviteCode).then(() => {
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    });
+  }
+
   const userBranches = branches.filter((b) => currentUser.branchIds.includes(b.id));
   const initials = currentUser.name.split(" ").map((n) => n[0]).join("").slice(0, 2);
 
   return (
     <div className="p-6 max-w-2xl animate-fade-in">
+      {projectInfo && (
+        <div className="border border-border rounded-lg p-4 bg-card mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Icon name="Share2" size={13} className="text-accent" />
+            <p className="text-xs font-medium text-muted-foreground">Код проекта</p>
+          </div>
+          <p className="text-xs text-muted-foreground mb-2">{projectInfo.name}</p>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 bg-muted rounded-lg px-4 py-2.5 font-mono text-lg font-bold text-foreground tracking-widest text-center select-all">
+              {projectInfo.inviteCode}
+            </div>
+            <button
+              onClick={copyCode}
+              className="p-2.5 rounded-lg border border-border hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+              title="Скопировать"
+            >
+              <Icon name={codeCopied ? "Check" : "Copy"} size={16} />
+            </button>
+          </div>
+          <p className="text-[11px] text-muted-foreground mt-2">
+            Поделитесь этим кодом с коллегами для доступа к проекту
+          </p>
+        </div>
+      )}
+
       {/* Avatar + info */}
       <div className="flex items-start gap-5 mb-8">
         <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-2xl font-bold text-primary flex-shrink-0">
