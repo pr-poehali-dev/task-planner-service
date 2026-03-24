@@ -44,8 +44,6 @@ export default function NotesPage({
   const [newAttachments, setNewAttachments] = useState<NoteAttachment[]>([]);
   const [newShareWith, setNewShareWith] = useState<string[]>([]);
 
-  const [search, setSearch] = useState("");
-
   const [expandedNoteId, setExpandedNoteId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
@@ -59,14 +57,6 @@ export default function NotesPage({
       n.ownerEmployeeId === currentUser.id ||
       n.sharedWithEmployeeIds.includes(currentUser.id)
   );
-
-  const visibleNotes = search
-    ? myNotes.filter(
-        (n) =>
-          n.title.toLowerCase().includes(search.toLowerCase()) ||
-          n.content.toLowerCase().includes(search.toLowerCase())
-      )
-    : myNotes;
 
   function handleFileUpload(files: FileList | null, target: "new" | "edit", noteId?: string) {
     if (!files) return;
@@ -306,19 +296,8 @@ export default function NotesPage({
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative">
-        <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по заметкам..."
-          className="w-full text-xs border border-border rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-accent bg-background"
-        />
-      </div>
-
       {/* Notes list */}
-      {visibleNotes.length === 0 && !creating && (
+      {myNotes.length === 0 && !creating && (
         <div className="text-center py-12 text-muted-foreground">
           <Icon name="StickyNote" size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Нет заметок</p>
@@ -327,7 +306,7 @@ export default function NotesPage({
       )}
 
       <div className="grid gap-3">
-        {visibleNotes.map((note) => {
+        {myNotes.map((note) => {
           const isOwner = note.ownerEmployeeId === currentUser.id;
           const isExpanded = expandedNoteId === note.id;
           const sharedFrom = !isOwner

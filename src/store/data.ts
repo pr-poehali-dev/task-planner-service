@@ -57,7 +57,6 @@ export interface Task {
   personalGoalId?: string;
   customTypeId?: string;
   comment?: string;
-  linkedNoteId?: string;
 }
 
 export interface GroupGoal {

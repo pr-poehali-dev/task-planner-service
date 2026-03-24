@@ -235,8 +235,6 @@ export default function Index() {
           onPersonalGoalsChange={setPersonalGoals}
           userTaskTypes={userTaskTypes}
           onUserTaskTypesChange={setUserTaskTypes}
-          notes={notes}
-          onNavigate={setActivePage}
         />
       )}
       {activePage === "team" && (isDirector || (currentUser.permissions || DEFAULT_PERMISSIONS).canViewTeamPlanner) && (

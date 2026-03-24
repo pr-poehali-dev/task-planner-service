@@ -59,7 +59,6 @@ export default function FilesPage({
   files,
   onFilesChange,
 }: Props) {
-  const [search, setSearch] = useState("");
   const [dragging, setDragging] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -73,10 +72,6 @@ export default function FilesPage({
       f.ownerEmployeeId === currentUser.id ||
       f.sharedWithEmployeeIds.includes(currentUser.id)
   );
-
-  const visibleFiles = search
-    ? myFiles.filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
-    : myFiles;
 
   const uploadFiles = useCallback(
     (fileList: FileList | null) => {
@@ -212,19 +207,8 @@ export default function FilesPage({
         </p>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Icon name="Search" size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Поиск по файлам..."
-          className="w-full text-xs border border-border rounded-lg pl-9 pr-3 py-2.5 outline-none focus:border-accent bg-background"
-        />
-      </div>
-
       {/* Files list */}
-      {visibleFiles.length === 0 && (
+      {myFiles.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           <Icon name="FolderOpen" size={32} className="mx-auto mb-3 opacity-30" />
           <p className="text-sm">Нет файлов</p>
@@ -233,7 +217,7 @@ export default function FilesPage({
       )}
 
       <div className="grid gap-2">
-        {visibleFiles.map((file) => {
+        {myFiles.map((file) => {
           const isOwner = file.ownerEmployeeId === currentUser.id;
           const iconName = getFileIcon(file.type, file.name);
           const isRenaming = renamingId === file.id;
