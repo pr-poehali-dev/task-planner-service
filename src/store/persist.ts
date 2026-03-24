@@ -40,3 +40,39 @@ export function clearStorage(): void {
     // Ignore
   }
 }
+
+// ─── Project Info ───────────────────────────────────────────────────────────
+
+const PROJECT_KEY = "planner_project";
+
+export interface ProjectInfo {
+  projectId: string;
+  name: string;
+  inviteCode: string;
+}
+
+export function saveProjectInfo(info: ProjectInfo): void {
+  try {
+    localStorage.setItem(PROJECT_KEY, JSON.stringify(info));
+  } catch {
+    // Storage full or unavailable
+  }
+}
+
+export function loadProjectInfo(): ProjectInfo | null {
+  try {
+    const raw = localStorage.getItem(PROJECT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as ProjectInfo;
+  } catch {
+    return null;
+  }
+}
+
+export function clearProjectInfo(): void {
+  try {
+    localStorage.removeItem(PROJECT_KEY);
+  } catch {
+    // Ignore
+  }
+}

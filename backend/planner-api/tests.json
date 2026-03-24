@@ -1,0 +1,69 @@
+{
+  "tests": [
+    {
+      "name": "Health check",
+      "method": "GET",
+      "path": "/?action=health",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "status": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create project",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "create",
+        "name": "Тестовый проект",
+        "ownerName": "Иван"
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "projectId": "string",
+        "inviteCode": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Join with invalid code returns 404",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "join",
+        "inviteCode": "PLAN-ZZZZZZ"
+      },
+      "expectedStatus": 404,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Load unknown project returns 404",
+      "method": "GET",
+      "path": "/?action=load&projectId=p_nonexistent",
+      "expectedStatus": 404,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Save to unknown project returns 404",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "action": "save",
+        "projectId": "p_nonexistent",
+        "data": {"tasks": []}
+      },
+      "expectedStatus": 404,
+      "expectedBody": {
+        "error": "string"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
