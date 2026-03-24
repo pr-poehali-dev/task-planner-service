@@ -249,8 +249,13 @@ export default function Index() {
     saveProjectInfo(info);
     setProjectInfo(info);
     applyProjectData(result.data);
-    setCurrentUser(null);
-    localStorage.removeItem("planner_current_user");
+    const emps = (result.data.employees || []) as Employee[];
+    if (emps.length === 1) {
+      setCurrentUser(emps[0]);
+    } else {
+      setCurrentUser(null);
+      localStorage.removeItem("planner_current_user");
+    }
   }
 
   function handleProjectJoin(result: {
