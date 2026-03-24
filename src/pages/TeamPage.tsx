@@ -48,6 +48,7 @@ export default function TeamPage({
     categoryId: "",
     assignedEmployeeId: "",
     noDate: false,
+    allBranches: false,
   });
   const [expandedGoals, setExpandedGoals] = useState<Set<string>>(
     new Set(groupGoals.map((g) => g.id))
@@ -90,7 +91,7 @@ export default function TeamPage({
   }
 
   function addGroupTask(goalId: string) {
-    if (!newTask.title.trim() || !newTask.assignedEmployeeId) return;
+    if (!newTask.title.trim()) return;
     if (!newTask.noDate && !newTask.deadline) return;
 
     const goal = groupGoals.find((g) => g.id === goalId);
@@ -101,7 +102,6 @@ export default function TeamPage({
     let scheduledDates: number[] = [];
 
     if (newTask.noDate) {
-      // No date pinned - use current month
       monthYear = currentMonth;
     } else {
       const deadline = new Date(newTask.deadline);
@@ -110,38 +110,81 @@ export default function TeamPage({
       scheduledDates = [deadlineDay];
     }
 
-    const gt: GroupTask = {
-      id: `gt_${Date.now()}`,
-      goalId,
-      title: newTask.title.trim(),
-      branchId: activeBranchId,
-      deadline: newTask.noDate ? undefined : newTask.deadline,
-      categoryId: newTask.categoryId || categories[0]?.id || "",
-      assignedEmployeeId: newTask.assignedEmployeeId,
-      monthYear,
-      completedByEmployee: false,
-      createdByEmployeeId: currentUser.id,
-    };
+    const newGTs: GroupTask[] = [];
+    const newTasks: Task[] = [];
 
-    const personalTask: Task = {
-      id: `t_${Date.now()}`,
-      title: newTask.title.trim(),
-      type: "variable",
-      employeeId: newTask.assignedEmployeeId,
-      branchId: activeBranchId,
-      categoryId: newTask.categoryId,
-      monthYear,
-      scheduledDates,
-      completedDates: [],
-      fromGroupTaskId: gt.id,
-      deadline: deadlineDay,
-      createdByEmployeeId: currentUser.id,
-      goalTitle,
-    };
+    if (newTask.allBranches) {
+      branches.forEach((branch, i) => {
+        const bEmployees = employees.filter((e) => e.branchIds.includes(branch.id) && e.role !== "director");
+        const assignee = newTask.assignedEmployeeId
+          ? (bEmployees.find((e) => e.id === newTask.assignedEmployeeId) || bEmployees[0])
+          : bEmployees[0];
+        if (!assignee) return;
 
-    onGroupTasksChange([...groupTasks, gt]);
-    onTasksChange([...tasks, personalTask]);
-    setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "", noDate: false });
+        const gtId = `gt_${Date.now()}_${i}`;
+        newGTs.push({
+          id: gtId,
+          goalId,
+          title: newTask.title.trim(),
+          branchId: branch.id,
+          deadline: newTask.noDate ? undefined : newTask.deadline,
+          categoryId: newTask.categoryId || categories[0]?.id || "",
+          assignedEmployeeId: assignee.id,
+          monthYear,
+          completedByEmployee: false,
+          createdByEmployeeId: currentUser.id,
+        });
+        newTasks.push({
+          id: `t_${Date.now()}_${i}`,
+          title: newTask.title.trim(),
+          type: "variable",
+          employeeId: assignee.id,
+          branchId: branch.id,
+          categoryId: newTask.categoryId,
+          monthYear,
+          scheduledDates: [...scheduledDates],
+          completedDates: [],
+          fromGroupTaskId: gtId,
+          deadline: deadlineDay,
+          createdByEmployeeId: currentUser.id,
+          goalTitle,
+        });
+      });
+    } else {
+      if (!newTask.assignedEmployeeId) return;
+      const gtId = `gt_${Date.now()}`;
+      newGTs.push({
+        id: gtId,
+        goalId,
+        title: newTask.title.trim(),
+        branchId: activeBranchId,
+        deadline: newTask.noDate ? undefined : newTask.deadline,
+        categoryId: newTask.categoryId || categories[0]?.id || "",
+        assignedEmployeeId: newTask.assignedEmployeeId,
+        monthYear,
+        completedByEmployee: false,
+        createdByEmployeeId: currentUser.id,
+      });
+      newTasks.push({
+        id: `t_${Date.now()}`,
+        title: newTask.title.trim(),
+        type: "variable",
+        employeeId: newTask.assignedEmployeeId,
+        branchId: activeBranchId,
+        categoryId: newTask.categoryId,
+        monthYear,
+        scheduledDates,
+        completedDates: [],
+        fromGroupTaskId: gtId,
+        deadline: deadlineDay,
+        createdByEmployeeId: currentUser.id,
+        goalTitle,
+      });
+    }
+
+    onGroupTasksChange([...groupTasks, ...newGTs]);
+    onTasksChange([...tasks, ...newTasks]);
+    setNewTask({ title: "", deadline: "", categoryId: "", assignedEmployeeId: "", noDate: false, allBranches: false });
     setAddingTaskForGoal(null);
   }
 
@@ -458,23 +501,45 @@ export default function TeamPage({
                               </option>
                             ))}
                           </select>
-                          <select
-                            value={newTask.assignedEmployeeId}
-                            onChange={(e) =>
-                              setNewTask((p) => ({
-                                ...p,
-                                assignedEmployeeId: e.target.value,
-                              }))
-                            }
-                            className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background col-span-2"
-                          >
-                            <option value="">Выбрать ответственного</option>
-                            {branchEmployees.map((e) => (
-                              <option key={e.id} value={e.id}>
-                                {e.name} -- {e.roleLabel}
-                              </option>
-                            ))}
-                          </select>
+                          {branches.length > 1 && (
+                            <label className="flex items-center gap-2 cursor-pointer col-span-2">
+                              <input
+                                type="checkbox"
+                                checked={newTask.allBranches}
+                                onChange={(e) =>
+                                  setNewTask((p) => ({ ...p, allBranches: e.target.checked, assignedEmployeeId: "" }))
+                                }
+                                className="rounded border-border"
+                              />
+                              <span className="text-xs text-muted-foreground">
+                                Для всех филиалов
+                              </span>
+                            </label>
+                          )}
+                          {!newTask.allBranches && (
+                            <select
+                              value={newTask.assignedEmployeeId}
+                              onChange={(e) =>
+                                setNewTask((p) => ({
+                                  ...p,
+                                  assignedEmployeeId: e.target.value,
+                                }))
+                              }
+                              className="text-xs border border-border rounded px-2 py-1.5 outline-none bg-background col-span-2"
+                            >
+                              <option value="">Выбрать ответственного</option>
+                              {branchEmployees.map((e) => (
+                                <option key={e.id} value={e.id}>
+                                  {e.name} -- {e.roleLabel}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                          {newTask.allBranches && (
+                            <p className="text-[11px] text-muted-foreground col-span-2">
+                              Задача будет создана для каждого филиала и назначена первому сотруднику
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2 mt-2">
                           <button
