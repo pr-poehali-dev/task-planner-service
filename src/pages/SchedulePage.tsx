@@ -303,6 +303,12 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
               </button>
               <button onClick={(e) => { e.stopPropagation(); updateCell(ri, ci, "paid", !cell.paid); }}
                 style={{ fontSize: 9, color: cell.paid ? "#7c5cbf" : "#bbb", background: "none", border: "none", cursor: "pointer", fontWeight: cell.paid ? 700 : 400 }}>$ {cell.paid ? "✓" : ""}</button>
+              {(cell.training || cell.trainer) && (
+                <button onClick={(e) => { e.stopPropagation(); updateCell(ri, ci, "training", ""); updateCell(ri, ci, "trainer", ""); updateCell(ri, ci, "colorId", "none"); updateCell(ri, ci, "paid", false); setEditingCell(null); setColorPickerFor(null); }}
+                  style={{ fontSize: 9, color: "#e55", background: "none", border: "none", cursor: "pointer" }}>
+                  <Icon name="Trash2" size={10} />
+                </button>
+              )}
               <button onClick={(e) => { e.stopPropagation(); setEditingCell(null); setColorPickerFor(null); }}
                 style={{ fontSize: 9, color: "#7c5cbf", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}>OK</button>
             </div>
