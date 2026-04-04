@@ -260,19 +260,19 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     boxShadow: isEdit ? "0 0 0 2px #7c5cbf" : "none",
     padding: "4px 6px",
     minHeight: 0,
-    overflow: "hidden",
+    overflow: isEdit ? "visible" : "hidden",
   });
 
   /* ── cell content (view mode) ── */
   function cellContent(cell: ScheduleCell) {
     if (!cell.training) return null;
     return (
-      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.2 }}>{cell.training}</span>
+      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.1, textAlign: "center", wordBreak: "break-word" }}>{cell.training}</span>
           {cell.paid && <span style={{ fontSize: 9, fontWeight: 700, color: "#7c5cbf" }}>$</span>}
         </div>
-        {cell.trainer && <p style={{ fontSize: 9, color: "#777", lineHeight: 1.2, marginTop: 1 }}>{cell.trainer}</p>}
+        {cell.trainer && <p style={{ fontSize: 9, color: "#777", lineHeight: 1.1, marginTop: 1, textAlign: "center" }}>{cell.trainer}</p>}
       </div>
     );
   }
@@ -285,7 +285,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
 
     return (
       <div key={ci} style={{ ...cellStyle(color.hex, isEd), cursor: isExport ? "default" : "pointer" }}
-        onClick={() => { if (!isExport && !isEd) { setEditingCell({ row: ri, col: ci }); setColorPickerFor(null); } }}>
+        onClick={(e) => { if (isEd) { e.stopPropagation(); return; } if (!isExport) { setEditingCell({ row: ri, col: ci }); setColorPickerFor(null); } }}>
         {isEd && !isExport ? (
           <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
             <input autoFocus value={cell.training} onChange={(e) => updateCell(ri, ci, "training", e.target.value)} placeholder="Тренировка"
@@ -318,8 +318,8 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
 
   /* ── header cell ── */
   const hdrCell = (text: string, extra?: React.CSSProperties) => (
-    <div style={{ borderRadius: 8, background: "#e8e0f0", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 0", ...extra }}>
-      <span style={{ fontSize: text === "ВРЕМЯ" || text === "ЗАЛ" ? 10 : 11, fontWeight: 700, color: "#1a1a2e", letterSpacing: "0.08em" }}>{text}</span>
+    <div style={{ borderRadius: 8, background: "#e8e0f0", display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 0", height: "100%", ...extra }}>
+      <span style={{ fontSize: text === "ВРЕМЯ" || text === "ЗАЛ" ? 10 : 11, fontWeight: 700, color: "#1a1a2e", letterSpacing: "0.08em", textAlign: "center" }}>{text}</span>
     </div>
   );
 
@@ -336,7 +336,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
         </div>
         {slots.map((slot, ri) => (
           <div key={ri} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: `1 1 calc(100%/${cnt})`, minHeight: 40 }}>
-            <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
               {!isExport && editingTime === ri ? (
                 <input autoFocus value={slot.time} onChange={(e) => updateTime(ri, e.target.value)} onBlur={() => setEditingTime(null)} onKeyDown={(e) => e.key === "Enter" && setEditingTime(null)}
                   style={{ width: "100%", fontSize: 12, fontWeight: 800, textAlign: "center", background: "transparent", outline: "none", border: "none", fontFamily: "monospace", color: "#1a1a2e" }} placeholder="0000" />
@@ -381,14 +381,14 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
                   </div>
                 ) : <div />}
                 {showHallCol && (
-                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 4px" }}>
-                    <span style={{ fontSize: 9, fontWeight: 600, color: "#7c5cbf", textAlign: "center", lineHeight: 1.1 }}>{entry.hallName}</span>
+                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 2px", overflow: "hidden" }}>
+                    <span style={{ fontSize: Math.min(9, entry.hallName.length > 6 ? 7 : 9), fontWeight: 600, color: "#7c5cbf", textAlign: "center", lineHeight: 1.1, wordBreak: "break-word", overflow: "hidden", maxWidth: "100%" }}>{entry.hallName}</span>
                   </div>
                 )}
                 {entry.cells.map((cell, ci) => {
                   const color = getCellColor(cell.colorId);
                   return (
-                    <div key={ci} style={cellStyle(color.hex, false)}>
+                    <div key={ci} style={{ ...cellStyle(color.hex, false), height: "100%" }}>
                       {cellContent(cell)}
                     </div>
                   );
@@ -402,7 +402,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" onClick={() => { if (colorPickerFor) setColorPickerFor(null); }}>
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-foreground">Расписание</h1>
         <div className="flex gap-2 items-center relative">
@@ -476,8 +476,8 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
         {(exporting ? exportOpts.showTitle : true) && (
           <div style={{ marginBottom: exporting ? 14 : 10, textAlign: "left" }}>
             {exporting ? (
-              <div style={{ display: "inline-block", background: "#e8e0f0", borderRadius: 8, padding: "5px 18px" }}>
-                <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.04em", textTransform: "uppercase" }}>{schedule.title}</span>
+              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#e8e0f0", borderRadius: 8, padding: "5px 18px" }}>
+                <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.04em", textTransform: "uppercase", lineHeight: 1.3 }}>{schedule.title}</span>
               </div>
             ) : editingTitle ? (
               <input autoFocus value={schedule.title} onChange={(e) => updateSchedule((s) => ({ ...s, title: e.target.value }))}
