@@ -59,6 +59,7 @@ function getInitialState() {
       notes: (saved.notes || MOCK_NOTES) as Note[],
       files: (saved.files || MOCK_FILES) as SharedFile[],
       passwords: saved.passwords || EMPLOYEE_PASSWORDS,
+      schedules: saved.schedules || {},
       currentUserId: saved.currentUserId,
     };
   }
@@ -74,6 +75,7 @@ function getInitialState() {
     notes: [] as Note[],
     files: [] as SharedFile[],
     passwords: {} as Record<string, string>,
+    schedules: {} as Record<string, unknown>,
     currentUserId: null as string | null,
   };
 }
@@ -100,6 +102,7 @@ export default function Index() {
   const [notes, setNotes] = useState<Note[]>(initial.notes);
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>(initial.files);
   const [passwords, setPasswords] = useState<Record<string, string>>(initial.passwords);
+  const [scheduleData, setScheduleData] = useState<Record<string, unknown>>(initial.schedules || {});
   const [currentUser, setCurrentUser] = useState<Employee | null>(
     initial.currentUserId
       ? initial.employees.find((e: Employee) => e.id === initial.currentUserId) || null
@@ -123,6 +126,7 @@ export default function Index() {
       notes,
       files: sharedFiles,
       passwords,
+      schedules: scheduleData,
     };
   }
 
@@ -138,6 +142,7 @@ export default function Index() {
     if (data.notes) setNotes(data.notes as Note[]);
     if (data.files) setSharedFiles(data.files as SharedFile[]);
     if (data.passwords) setPasswords(data.passwords as Record<string, string>);
+    if (data.schedules) setScheduleData(data.schedules as Record<string, unknown>);
   }
 
   // Load project from server on start
@@ -166,9 +171,10 @@ export default function Index() {
       notes,
       files: sharedFiles,
       passwords,
+      schedules: scheduleData,
       currentUserId: currentUser?.id || null,
     });
-  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, notes, sharedFiles, passwords, currentUser]);
+  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, notes, sharedFiles, passwords, scheduleData, currentUser]);
 
   useEffect(() => {
     persist();
@@ -189,7 +195,7 @@ export default function Index() {
     return () => {
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
     };
-  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, notes, sharedFiles, passwords, projectInfo]);
+  }, [branches, employees, categories, tasks, groupGoals, groupTasks, personalGoals, userTaskTypes, notes, sharedFiles, passwords, scheduleData, projectInfo]);
 
   // ─── Notifications ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -452,6 +458,8 @@ export default function Index() {
           currentUser={currentUser}
           branches={isDirector ? branches : visibleBranches}
           employees={employees}
+          schedules={scheduleData}
+          onSchedulesChange={setScheduleData}
         />
       )}
       {activePage === "notes" && (
