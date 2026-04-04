@@ -229,7 +229,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     setShowExportMenu(false);
     await new Promise((r) => setTimeout(r, 400));
     try {
-      const canvas = await html2canvas(tableRef.current, { scale: 3, backgroundColor: "#ffffff", useCORS: true });
+      const canvas = await html2canvas(tableRef.current, { scale: 3, backgroundColor: "#ffffff", useCORS: true, windowWidth: 1200 });
       if (format === "png") {
         const link = document.createElement("a");
         link.download = `расписание-${branches.find((b) => b.id === activeBranchId)?.name || ""}.png`;
@@ -281,12 +281,12 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     return (
       <>
         {cell.paid && (
-          <span style={{ position: "absolute", top: 2, right: 4, fontSize: 8, fontWeight: 700, color: "#7c5cbf", lineHeight: 1 }}>$</span>
+          <span style={{ position: "absolute", top: 2, right: 4, fontSize: 8, fontWeight: 700, color: "#7c5cbf", lineHeight: 1, zIndex: 1 }}>$</span>
         )}
         {cell.training && (
-          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.1, textAlign: "center", wordBreak: "break-word" }}>{cell.training}</span>
-            {cell.trainer && <p style={{ fontSize: 9, color: "#777", lineHeight: 1.1, marginTop: 1, textAlign: "center" }}>{cell.trainer}</p>}
+          <div style={{ textAlign: "center", width: "100%" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.1, textAlign: "center", wordBreak: "break-word", display: "block" }}>{cell.training}</span>
+            {cell.trainer && <span style={{ fontSize: 9, color: "#777", lineHeight: 1.1, marginTop: 1, textAlign: "center", display: "block" }}>{cell.trainer}</span>}
           </div>
         )}
       </>
@@ -349,6 +349,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
   function renderSingleGrid(slots: TimeSlot[], isExport: boolean) {
     const cnt = slots.length || 1;
     const gridCols = `64px repeat(7, 1fr)${!isExport ? " 28px" : ""}`;
+    const rowH = isExport ? 44 : undefined;
     return (
       <div style={{ flex: isExport ? "0 0 auto" : 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
         <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4 }}>
@@ -357,16 +358,16 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
           {!isExport && <div />}
         </div>
         {slots.map((slot, ri) => (
-          <div key={ri} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: isExport ? "0 0 auto" : `1 1 calc(100%/${cnt})`, minHeight: isExport ? 32 : 40 }}>
-            <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+          <div key={ri} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, ...(isExport ? { height: rowH } : { flex: `1 1 calc(100%/${cnt})`, minHeight: 40 }) }}>
+            <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", height: rowH }}>
               {!isExport && editingTime === ri ? (
                 <input autoFocus value={slot.time} onChange={(e) => updateTime(ri, e.target.value)} onBlur={() => setEditingTime(null)} onKeyDown={(e) => e.key === "Enter" && setEditingTime(null)}
                   style={{ width: "100%", fontSize: 12, fontWeight: 800, textAlign: "center", background: "transparent", outline: "none", border: "none", fontFamily: "monospace", color: "#1a1a2e" }} placeholder="0000" />
               ) : (
-                <button onClick={() => !isExport && setEditingTime(ri)}
-                  style={{ width: "100%", height: "100%", fontSize: 12, fontWeight: 800, textAlign: "center", background: "transparent", border: "none", cursor: isExport ? "default" : "text", fontFamily: "monospace", color: "#1a1a2e" }}>
+                <span style={{ width: "100%", fontSize: 12, fontWeight: 800, textAlign: "center", fontFamily: "monospace", color: "#1a1a2e", cursor: isExport ? "default" : "text" }}
+                  onClick={() => !isExport && setEditingTime(ri)}>
                   {slot.time || (!isExport ? "—" : "")}
-                </button>
+                </span>
               )}
             </div>
             {slot.cells.map((c, ci) => renderEditableCell(c, ri, ci, isExport))}
@@ -387,6 +388,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     const gridCols = showHallCol ? `64px 56px repeat(7, 1fr)` : `64px repeat(7, 1fr)`;
 
     const totalSubRows = rows.reduce((s, r) => s + r.entries.length, 0) || 1;
+    const rowH = isExport ? 40 : undefined;
 
     return (
       <div style={{ flex: isExport ? "0 0 auto" : 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
@@ -396,23 +398,23 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
           {DAYS.map((d) => <div key={d}>{hdrCell(d)}</div>)}
         </div>
         {rows.map((row, ri) => (
-          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2, flex: isExport ? "0 0 auto" : `${row.entries.length} 1 0%` }}>
+          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2, ...(isExport ? {} : { flex: `${row.entries.length} 1 0%` }) }}>
             {row.entries.map((entry, ei) => (
-              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: isExport ? "0 0 auto" : `1 1 calc(100% / ${totalSubRows})`, minHeight: isExport ? 32 : 36 }}>
+              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, ...(isExport ? { height: rowH } : { flex: `1 1 calc(100% / ${totalSubRows})`, minHeight: 36 }) }}>
                 {ei === 0 ? (
-                  <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", gridRow: row.entries.length > 1 ? `span ${row.entries.length}` : undefined, height: "100%" }}>
+                  <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", gridRow: row.entries.length > 1 ? `span ${row.entries.length}` : undefined, height: row.entries.length > 1 && isExport ? (rowH! * row.entries.length + (row.entries.length - 1) * 2) : rowH }}>
                     <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: "#1a1a2e" }}>{row.time}</span>
                   </div>
                 ) : <div />}
                 {showHallCol && (
-                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 2px", overflow: "hidden", height: "100%" }}>
+                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 2px", overflow: "hidden", height: rowH }}>
                     <span style={{ fontSize: Math.min(9, entry.hallName.length > 6 ? 7 : 9), fontWeight: 600, color: "#7c5cbf", textAlign: "center", lineHeight: 1.1, wordBreak: "break-word", overflow: "hidden", maxWidth: "100%" }}>{entry.hallName}</span>
                   </div>
                 )}
                 {entry.cells.map((cell, ci) => {
                   const color = getCellColor(cell.colorId);
                   return (
-                    <div key={ci} style={{ ...cellStyle(color.hex, false), height: "100%" }}>
+                    <div key={ci} style={{ ...cellStyle(color.hex, false), height: rowH }}>
                       {cellContent(cell)}
                     </div>
                   );
@@ -495,12 +497,12 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
       </div>
 
       <div ref={tableRef} className="bg-white rounded-2xl overflow-hidden"
-        style={{ aspectRatio: exporting ? undefined : `${ASPECT}`, padding: exporting ? "28px 32px 20px" : "20px 24px 16px", display: "flex", flexDirection: "column" }}>
+        style={{ aspectRatio: exporting ? undefined : `${ASPECT}`, padding: exporting ? "28px 32px 20px" : "20px 24px 16px", display: "flex", flexDirection: "column", ...(exporting ? { width: 900 } : {}) }}>
 
         {(exporting ? exportOpts.showTitle : true) && (
           <div style={{ marginBottom: exporting ? 14 : 10, textAlign: "left" }}>
             {exporting ? (
-              <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#e8e0f0", borderRadius: 8, padding: "5px 18px" }}>
+              <div style={{ display: "inline-block", background: "#e8e0f0", borderRadius: 8, padding: "5px 18px" }}>
                 <span style={{ fontSize: 13, fontWeight: 800, color: "#1a1a2e", letterSpacing: "0.04em", textTransform: "uppercase", lineHeight: 1.3 }}>{schedule.title}</span>
               </div>
             ) : editingTitle ? (
