@@ -4,23 +4,25 @@ import type { Branch, Employee } from "@/store/data";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 
-const DAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const DAYS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"];
 
 const CELL_COLORS = [
-  { id: "none", label: "Без цвета", bg: "bg-background", hex: "#ffffff" },
-  { id: "blue", label: "Синий", bg: "bg-blue-100", hex: "#dbeafe" },
-  { id: "green", label: "Зелёный", bg: "bg-green-100", hex: "#dcfce7" },
-  { id: "yellow", label: "Жёлтый", bg: "bg-yellow-100", hex: "#fef9c3" },
-  { id: "pink", label: "Розовый", bg: "bg-pink-100", hex: "#fce7f3" },
-  { id: "purple", label: "Фиолетовый", bg: "bg-purple-100", hex: "#f3e8ff" },
-  { id: "orange", label: "Оранжевый", bg: "bg-orange-100", hex: "#ffedd5" },
-  { id: "cyan", label: "Бирюзовый", bg: "bg-cyan-100", hex: "#cffafe" },
+  { id: "none", label: "Без цвета", bg: "#f8f9fa", hex: "#f8f9fa" },
+  { id: "blue", label: "Синий", bg: "#dbeafe", hex: "#dbeafe" },
+  { id: "green", label: "Зелёный", bg: "#dcfce7", hex: "#dcfce7" },
+  { id: "yellow", label: "Жёлтый", bg: "#fef9c3", hex: "#fef9c3" },
+  { id: "pink", label: "Розовый", bg: "#fce7f3", hex: "#fce7f3" },
+  { id: "purple", label: "Фиолетовый", bg: "#f3e8ff", hex: "#f3e8ff" },
+  { id: "orange", label: "Оранжевый", bg: "#ffedd5", hex: "#ffedd5" },
+  { id: "cyan", label: "Бирюзовый", bg: "#cffafe", hex: "#cffafe" },
+  { id: "lavender", label: "Лавандовый", bg: "#e8e0f0", hex: "#e8e0f0" },
 ];
 
 interface ScheduleCell {
   training: string;
   trainer: string;
   colorId: string;
+  paid?: boolean;
 }
 
 interface TimeSlot {
@@ -45,13 +47,13 @@ interface Props {
 function createEmptyRow(): TimeSlot {
   return {
     time: "",
-    cells: DAYS.map(() => ({ training: "", trainer: "", colorId: "none" })),
+    cells: DAYS.map(() => ({ training: "", trainer: "", colorId: "none", paid: false })),
   };
 }
 
 function createDefaultSchedule(): ScheduleData {
   return {
-    title: "Расписание тренировок",
+    title: "РАСПИСАНИЕ ТРЕНИРОВОК",
     timeSlots: [
       createEmptyRow(),
       createEmptyRow(),
@@ -65,11 +67,14 @@ function createDefaultSchedule(): ScheduleData {
   };
 }
 
-export default function SchedulePage({ currentUser, branches, employees }: Props) {
+const ASPECT_RATIO = 297 / 210;
+
+export default function SchedulePage({ branches }: Props) {
   const [activeBranchId, setActiveBranchId] = useState(branches[0]?.id || "");
   const [schedules, setSchedules] = useState<Record<string, ScheduleData>>({});
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
   const [editingTime, setEditingTime] = useState<number | null>(null);
+  const [editingTitle, setEditingTitle] = useState(false);
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiLoading, setAiLoading] = useState(false);
   const [colorPickerFor, setColorPickerFor] = useState<{ row: number; col: number } | null>(null);
@@ -88,7 +93,7 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
     [activeBranchId]
   );
 
-  function updateCell(row: number, col: number, field: keyof ScheduleCell, value: string) {
+  function updateCell(row: number, col: number, field: keyof ScheduleCell, value: string | boolean) {
     updateSchedule((s) => {
       const slots = [...s.timeSlots];
       const cells = [...slots[row].cells];
@@ -130,10 +135,11 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
     setEditingCell(null);
     setEditingTime(null);
     setColorPickerFor(null);
-    await new Promise((r) => setTimeout(r, 100));
+    setEditingTitle(false);
+    await new Promise((r) => setTimeout(r, 150));
     try {
       const canvas = await html2canvas(tableRef.current, {
-        scale: 2,
+        scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
       });
@@ -152,10 +158,11 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
     setEditingCell(null);
     setEditingTime(null);
     setColorPickerFor(null);
-    await new Promise((r) => setTimeout(r, 100));
+    setEditingTitle(false);
+    await new Promise((r) => setTimeout(r, 150));
     try {
       const canvas = await html2canvas(tableRef.current, {
-        scale: 2,
+        scale: 3,
         backgroundColor: "#ffffff",
         useCORS: true,
       });
@@ -163,9 +170,9 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
       const pdf = new jsPDF({
         orientation: "landscape",
         unit: "px",
-        format: [canvas.width / 2, canvas.height / 2],
+        format: [canvas.width / 3, canvas.height / 3],
       });
-      pdf.addImage(imgData, "PNG", 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width / 3, canvas.height / 3);
       pdf.save(`расписание-${branches.find((b) => b.id === activeBranchId)?.name || "филиал"}.pdf`);
     } finally {
       setExporting(false);
@@ -206,8 +213,7 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
     }
   }
 
-  const isDirector = currentUser.role === "director";
-  const branchName = branches.find((b) => b.id === activeBranchId)?.name || "";
+  const rowCount = schedule.timeSlots.length || 1;
 
   return (
     <div className="space-y-4">
@@ -258,263 +264,484 @@ export default function SchedulePage({ currentUser, branches, employees }: Props
 
       <div
         ref={tableRef}
-        className="bg-white rounded-lg border border-border overflow-hidden"
-        style={{ padding: exporting ? "24px" : undefined }}
+        className="bg-white rounded-2xl overflow-hidden"
+        style={{
+          aspectRatio: `${ASPECT_RATIO}`,
+          padding: exporting ? "28px 32px 20px" : "20px 24px 16px",
+          display: "flex",
+          flexDirection: "column",
+        }}
       >
-        {exporting && (
-          <h2
-            className="text-xl font-bold text-center mb-4"
-            style={{ color: "#111" }}
-          >
-            {schedule.title} {branchName && `— ${branchName}`}
-          </h2>
-        )}
-
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse min-w-[700px]">
-            <thead>
-              <tr>
-                <th className="border border-border bg-muted/40 px-3 py-2.5 text-xs font-semibold text-foreground w-20 text-center">
-                  Время
-                </th>
-                {DAYS.map((day) => (
-                  <th
-                    key={day}
-                    className="border border-border bg-muted/40 px-3 py-2.5 text-xs font-semibold text-foreground text-center"
-                  >
-                    {day}
-                  </th>
-                ))}
-                {!exporting && (
-                  <th className="border border-border bg-muted/40 px-1 py-2.5 w-8"></th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {schedule.timeSlots.map((slot, rowIdx) => (
-                <tr key={rowIdx}>
-                  <td className="border border-border px-1 py-1 text-center align-top">
-                    {!exporting && editingTime === rowIdx ? (
-                      <input
-                        autoFocus
-                        value={slot.time}
-                        onChange={(e) => updateTime(rowIdx, e.target.value)}
-                        onBlur={() => setEditingTime(null)}
-                        onKeyDown={(e) => e.key === "Enter" && setEditingTime(null)}
-                        className="w-full text-xs text-center bg-transparent outline-none border-b border-accent px-1 py-1 font-mono"
-                        placeholder="09:00"
-                      />
-                    ) : (
-                      <button
-                        onClick={() => !exporting && setEditingTime(rowIdx)}
-                        className="w-full text-xs text-center py-1 font-mono text-foreground hover:bg-muted/30 rounded cursor-text min-h-[32px]"
-                      >
-                        {slot.time || (
-                          <span className="text-muted-foreground/40">—</span>
-                        )}
-                      </button>
-                    )}
-                  </td>
-                  {slot.cells.map((cell, colIdx) => {
-                    const color = getCellColor(cell.colorId);
-                    const isEditing =
-                      editingCell?.row === rowIdx && editingCell?.col === colIdx;
-                    const showColorPicker =
-                      colorPickerFor?.row === rowIdx &&
-                      colorPickerFor?.col === colIdx;
-
-                    return (
-                      <td
-                        key={colIdx}
-                        className={`border border-border px-2 py-1.5 align-top relative group cursor-pointer transition-colors ${color.bg}`}
-                        style={exporting && cell.colorId !== "none" ? { backgroundColor: color.hex } : undefined}
-                        onClick={() => {
-                          if (!exporting && !isEditing) {
-                            setEditingCell({ row: rowIdx, col: colIdx });
-                            setColorPickerFor(null);
-                          }
-                        }}
-                      >
-                        {isEditing && !exporting ? (
-                          <div className="space-y-1">
-                            <input
-                              autoFocus
-                              value={cell.training}
-                              onChange={(e) =>
-                                updateCell(rowIdx, colIdx, "training", e.target.value)
-                              }
-                              placeholder="Тренировка"
-                              className="w-full text-xs font-medium bg-transparent outline-none border-b border-accent/30 pb-0.5"
-                            />
-                            <input
-                              value={cell.trainer}
-                              onChange={(e) =>
-                                updateCell(rowIdx, colIdx, "trainer", e.target.value)
-                              }
-                              placeholder="Тренер"
-                              className="w-full text-[10px] text-muted-foreground bg-transparent outline-none border-b border-accent/30 pb-0.5"
-                            />
-                            <div className="flex items-center justify-between pt-0.5">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setColorPickerFor(
-                                    showColorPicker ? null : { row: rowIdx, col: colIdx }
-                                  );
-                                }}
-                                className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-accent"
-                              >
-                                <div
-                                  className={`w-3 h-3 rounded-full border border-border ${color.bg}`}
-                                />
-                                Цвет
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setEditingCell(null);
-                                  setColorPickerFor(null);
-                                }}
-                                className="text-[10px] text-accent font-medium"
-                              >
-                                Готово
-                              </button>
-                            </div>
-                            {showColorPicker && (
-                              <div className="absolute z-20 top-full left-0 mt-1 bg-white border border-border rounded-lg shadow-lg p-2 flex gap-1.5 flex-wrap w-[180px]">
-                                {CELL_COLORS.map((c) => (
-                                  <button
-                                    key={c.id}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      updateCell(rowIdx, colIdx, "colorId", c.id);
-                                      setColorPickerFor(null);
-                                    }}
-                                    title={c.label}
-                                    className={`w-6 h-6 rounded-full border-2 transition-all ${c.bg} ${
-                                      cell.colorId === c.id
-                                        ? "border-accent scale-110"
-                                        : "border-border hover:border-accent/50"
-                                    }`}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="min-h-[36px]">
-                            {cell.training ? (
-                              <>
-                                <p className="text-xs font-medium text-foreground leading-tight">
-                                  {cell.training}
-                                </p>
-                                {cell.trainer && (
-                                  <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                                    {cell.trainer}
-                                  </p>
-                                )}
-                              </>
-                            ) : !exporting ? (
-                              <span className="text-[10px] text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                                Нажмите
-                              </span>
-                            ) : null}
-                          </div>
-                        )}
-                      </td>
-                    );
-                  })}
-                  {!exporting && (
-                    <td className="border border-border px-1 py-1 text-center align-middle">
-                      <button
-                        onClick={() => removeRow(rowIdx)}
-                        className="p-0.5 text-muted-foreground/40 hover:text-destructive transition-colors"
-                        title="Удалить строку"
-                      >
-                        <Icon name="X" size={12} />
-                      </button>
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Title */}
+        <div style={{ marginBottom: exporting ? 16 : 12, textAlign: "center" }}>
+          {exporting ? (
+            <div
+              style={{
+                display: "inline-block",
+                background: "#e8e0f0",
+                borderRadius: 12,
+                padding: "10px 36px",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 20,
+                  fontWeight: 800,
+                  color: "#1a1a2e",
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {schedule.title}
+              </span>
+            </div>
+          ) : editingTitle ? (
+            <div className="inline-flex items-center gap-2">
+              <input
+                autoFocus
+                value={schedule.title}
+                onChange={(e) => updateSchedule((s) => ({ ...s, title: e.target.value }))}
+                onBlur={() => setEditingTitle(false)}
+                onKeyDown={(e) => e.key === "Enter" && setEditingTitle(false)}
+                className="text-base font-extrabold text-center bg-transparent outline-none border-b-2 border-accent/40 px-4 py-1 uppercase tracking-wide"
+                style={{ minWidth: 250 }}
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditingTitle(true)}
+              className="inline-block rounded-xl px-6 py-2 hover:bg-purple-50 transition-colors cursor-text"
+              style={{ background: "#e8e0f0" }}
+            >
+              <span className="text-base font-extrabold text-[#1a1a2e] uppercase tracking-wide">
+                {schedule.title}
+              </span>
+              <Icon name="Pencil" size={11} className="inline ml-2 text-muted-foreground/50" />
+            </button>
+          )}
         </div>
 
+        {/* Grid */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
+          {/* Header row */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: `64px repeat(7, 1fr)${!exporting ? " 28px" : ""}`,
+              gap: 4,
+            }}
+          >
+            <div
+              style={{
+                borderRadius: 8,
+                background: "#e8e0f0",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "6px 0",
+              }}
+            >
+              <span style={{ fontSize: 10, fontWeight: 700, color: "#1a1a2e", letterSpacing: "0.05em" }}>
+                ВРЕМЯ
+              </span>
+            </div>
+            {DAYS.map((day) => (
+              <div
+                key={day}
+                style={{
+                  borderRadius: 8,
+                  background: "#e8e0f0",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  padding: "6px 0",
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: "#1a1a2e", letterSpacing: "0.08em" }}>
+                  {day}
+                </span>
+              </div>
+            ))}
+            {!exporting && <div />}
+          </div>
+
+          {/* Data rows */}
+          {schedule.timeSlots.map((slot, rowIdx) => {
+            const cellHeight = `calc((100% - ${(rowCount) * 4}px) / ${rowCount})`;
+
+            return (
+              <div
+                key={rowIdx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `64px repeat(7, 1fr)${!exporting ? " 28px" : ""}`,
+                  gap: 4,
+                  height: cellHeight,
+                  minHeight: 44,
+                }}
+              >
+                {/* Time cell */}
+                <div
+                  style={{
+                    borderRadius: 10,
+                    background: "#f0edf5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {!exporting && editingTime === rowIdx ? (
+                    <input
+                      autoFocus
+                      value={slot.time}
+                      onChange={(e) => updateTime(rowIdx, e.target.value)}
+                      onBlur={() => setEditingTime(null)}
+                      onKeyDown={(e) => e.key === "Enter" && setEditingTime(null)}
+                      style={{
+                        width: "100%",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textAlign: "center",
+                        background: "transparent",
+                        outline: "none",
+                        border: "none",
+                        fontFamily: "monospace",
+                        color: "#1a1a2e",
+                      }}
+                      placeholder="00:00"
+                    />
+                  ) : (
+                    <button
+                      onClick={() => !exporting && setEditingTime(rowIdx)}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        fontSize: 12,
+                        fontWeight: 800,
+                        textAlign: "center",
+                        background: "transparent",
+                        border: "none",
+                        cursor: exporting ? "default" : "text",
+                        fontFamily: "monospace",
+                        color: "#1a1a2e",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      {slot.time || (!exporting ? "—" : "")}
+                    </button>
+                  )}
+                </div>
+
+                {/* Day cells */}
+                {slot.cells.map((cell, colIdx) => {
+                  const color = getCellColor(cell.colorId);
+                  const isEditing = editingCell?.row === rowIdx && editingCell?.col === colIdx;
+                  const showColorPicker = colorPickerFor?.row === rowIdx && colorPickerFor?.col === colIdx;
+
+                  return (
+                    <div
+                      key={colIdx}
+                      style={{
+                        borderRadius: 10,
+                        background: color.hex,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        position: "relative",
+                        cursor: exporting ? "default" : "pointer",
+                        transition: "box-shadow 0.15s",
+                        boxShadow: isEditing ? "0 0 0 2px #7c5cbf" : "none",
+                        padding: "4px 6px",
+                      }}
+                      onClick={() => {
+                        if (!exporting && !isEditing) {
+                          setEditingCell({ row: rowIdx, col: colIdx });
+                          setColorPickerFor(null);
+                        }
+                      }}
+                    >
+                      {isEditing && !exporting ? (
+                        <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }}>
+                          <input
+                            autoFocus
+                            value={cell.training}
+                            onChange={(e) => updateCell(rowIdx, colIdx, "training", e.target.value)}
+                            placeholder="Тренировка"
+                            style={{
+                              width: "100%",
+                              fontSize: 11,
+                              fontWeight: 600,
+                              textAlign: "center",
+                              background: "transparent",
+                              outline: "none",
+                              border: "none",
+                              borderBottom: "1px solid #c4b5d0",
+                              paddingBottom: 1,
+                            }}
+                          />
+                          <input
+                            value={cell.trainer}
+                            onChange={(e) => updateCell(rowIdx, colIdx, "trainer", e.target.value)}
+                            placeholder="Тренер"
+                            style={{
+                              width: "100%",
+                              fontSize: 9,
+                              textAlign: "center",
+                              background: "transparent",
+                              outline: "none",
+                              border: "none",
+                              borderBottom: "1px solid #c4b5d0",
+                              color: "#666",
+                              paddingBottom: 1,
+                            }}
+                          />
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 1 }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setColorPickerFor(showColorPicker ? null : { row: rowIdx, col: colIdx });
+                              }}
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 3,
+                                fontSize: 9,
+                                color: "#888",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                            >
+                              <span
+                                style={{
+                                  width: 10,
+                                  height: 10,
+                                  borderRadius: "50%",
+                                  background: color.hex,
+                                  border: "1px solid #ccc",
+                                  display: "inline-block",
+                                }}
+                              />
+                              Цвет
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateCell(rowIdx, colIdx, "paid", !cell.paid);
+                              }}
+                              style={{
+                                fontSize: 9,
+                                color: cell.paid ? "#7c5cbf" : "#bbb",
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                                fontWeight: cell.paid ? 700 : 400,
+                              }}
+                            >
+                              $ {cell.paid ? "✓" : ""}
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingCell(null);
+                                setColorPickerFor(null);
+                              }}
+                              style={{
+                                fontSize: 9,
+                                color: "#7c5cbf",
+                                fontWeight: 600,
+                                background: "none",
+                                border: "none",
+                                cursor: "pointer",
+                              }}
+                            >
+                              OK
+                            </button>
+                          </div>
+                          {showColorPicker && (
+                            <div
+                              style={{
+                                position: "absolute",
+                                zIndex: 30,
+                                top: "100%",
+                                left: "50%",
+                                transform: "translateX(-50%)",
+                                marginTop: 4,
+                                background: "#fff",
+                                border: "1px solid #e0dce6",
+                                borderRadius: 10,
+                                boxShadow: "0 4px 16px rgba(0,0,0,0.10)",
+                                padding: 8,
+                                display: "flex",
+                                gap: 5,
+                                flexWrap: "wrap",
+                                width: 170,
+                              }}
+                            >
+                              {CELL_COLORS.map((c) => (
+                                <button
+                                  key={c.id}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    updateCell(rowIdx, colIdx, "colorId", c.id);
+                                    setColorPickerFor(null);
+                                  }}
+                                  title={c.label}
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: "50%",
+                                    border: cell.colorId === c.id ? "2px solid #7c5cbf" : "2px solid #ddd",
+                                    background: c.hex,
+                                    cursor: "pointer",
+                                    transform: cell.colorId === c.id ? "scale(1.15)" : "none",
+                                    transition: "all 0.12s",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div style={{ textAlign: "center", width: "100%" }}>
+                          {cell.training ? (
+                            <>
+                              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                                <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.2 }}>
+                                  {cell.training}
+                                </span>
+                                {cell.paid && (
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: "#7c5cbf" }}>$</span>
+                                )}
+                              </div>
+                              {cell.trainer && (
+                                <p style={{ fontSize: 9, color: "#777", lineHeight: 1.2, marginTop: 1 }}>
+                                  {cell.trainer}
+                                </p>
+                              )}
+                            </>
+                          ) : !exporting ? (
+                            <span style={{ fontSize: 9, color: "#ccc", opacity: 0 }} className="group-hover:opacity-100">
+                              +
+                            </span>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Delete row button */}
+                {!exporting && (
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <button
+                      onClick={() => removeRow(rowIdx)}
+                      className="text-muted-foreground/30 hover:text-destructive transition-colors"
+                      title="Удалить строку"
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 2 }}
+                    >
+                      <Icon name="X" size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add row */}
         {!exporting && (
           <button
             onClick={addRow}
-            className="w-full py-2 text-xs text-muted-foreground hover:text-accent hover:bg-muted/20 transition-colors flex items-center justify-center gap-1 border-t border-border"
+            className="text-muted-foreground hover:text-accent transition-colors"
+            style={{
+              width: "100%",
+              padding: "6px 0",
+              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 4,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              marginTop: 4,
+            }}
           >
             <Icon name="Plus" size={12} />
             Добавить строку
           </button>
         )}
 
+        {/* Footer info */}
         <div
-          className={`border-t border-border px-4 py-3 ${exporting ? "bg-muted/20" : ""}`}
-          style={exporting ? { backgroundColor: "#f8f8f8" } : undefined}
+          style={{
+            marginTop: exporting ? 10 : 8,
+            borderTop: "1px solid #eee",
+            paddingTop: 8,
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px 20px",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
         >
-          <div className="flex flex-wrap gap-x-6 gap-y-1.5 items-center">
-            {exporting ? (
-              <>
-                {schedule.address && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    📍 {schedule.address}
-                  </span>
-                )}
-                {schedule.phone && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    📞 {schedule.phone}
-                  </span>
-                )}
-                {schedule.nickname && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
-                    @ {schedule.nickname}
-                  </span>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <Icon name="MapPin" size={12} className="text-muted-foreground/60" />
-                  <input
-                    value={schedule.address}
-                    onChange={(e) =>
-                      updateSchedule((s) => ({ ...s, address: e.target.value }))
-                    }
-                    placeholder="Адрес филиала"
-                    className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground min-w-[140px]"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Icon name="Phone" size={12} className="text-muted-foreground/60" />
-                  <input
-                    value={schedule.phone}
-                    onChange={(e) =>
-                      updateSchedule((s) => ({ ...s, phone: e.target.value }))
-                    }
-                    placeholder="Телефон"
-                    className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground min-w-[120px]"
-                  />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Icon name="AtSign" size={12} className="text-muted-foreground/60" />
-                  <input
-                    value={schedule.nickname}
-                    onChange={(e) =>
-                      updateSchedule((s) => ({ ...s, nickname: e.target.value }))
-                    }
-                    placeholder="Никнейм / соцсеть"
-                    className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground min-w-[130px]"
-                  />
-                </div>
-              </>
-            )}
-          </div>
+          {exporting ? (
+            <>
+              {schedule.address && (
+                <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>
+                  📍 {schedule.address}
+                </span>
+              )}
+              {schedule.phone && (
+                <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>
+                  📞 {schedule.phone}
+                </span>
+              )}
+              {schedule.nickname && (
+                <span style={{ fontSize: 11, color: "#777", display: "flex", alignItems: "center", gap: 4 }}>
+                  @ {schedule.nickname}
+                </span>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Icon name="MapPin" size={12} className="text-muted-foreground/50" />
+                <input
+                  value={schedule.address}
+                  onChange={(e) => updateSchedule((s) => ({ ...s, address: e.target.value }))}
+                  placeholder="Адрес филиала"
+                  className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground"
+                  style={{ minWidth: 130 }}
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Icon name="Phone" size={12} className="text-muted-foreground/50" />
+                <input
+                  value={schedule.phone}
+                  onChange={(e) => updateSchedule((s) => ({ ...s, phone: e.target.value }))}
+                  placeholder="Телефон"
+                  className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground"
+                  style={{ minWidth: 110 }}
+                />
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Icon name="AtSign" size={12} className="text-muted-foreground/50" />
+                <input
+                  value={schedule.nickname}
+                  onChange={(e) => updateSchedule((s) => ({ ...s, nickname: e.target.value }))}
+                  placeholder="Никнейм / соцсеть"
+                  className="text-xs bg-transparent outline-none border-b border-transparent focus:border-accent/30 text-foreground"
+                  style={{ minWidth: 120 }}
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 
+      {/* AI Helper */}
       {!exporting && (
         <div className="bg-card border border-border rounded-lg px-4 py-3">
           <div className="flex items-center gap-2 mb-2">
