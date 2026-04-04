@@ -265,15 +265,19 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
 
   /* ── cell content (view mode) ── */
   function cellContent(cell: ScheduleCell) {
-    if (!cell.training) return null;
+    if (!cell.training && !cell.paid) return null;
     return (
-      <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.1, textAlign: "center", wordBreak: "break-word" }}>{cell.training}</span>
-          {cell.paid && <span style={{ fontSize: 9, fontWeight: 700, color: "#7c5cbf" }}>$</span>}
-        </div>
-        {cell.trainer && <p style={{ fontSize: 9, color: "#777", lineHeight: 1.1, marginTop: 1, textAlign: "center" }}>{cell.trainer}</p>}
-      </div>
+      <>
+        {cell.paid && (
+          <span style={{ position: "absolute", top: 2, right: 4, fontSize: 8, fontWeight: 700, color: "#7c5cbf", lineHeight: 1 }}>$</span>
+        )}
+        {cell.training && (
+          <div style={{ textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "100%", height: "100%" }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: "#1a1a2e", lineHeight: 1.1, textAlign: "center", wordBreak: "break-word" }}>{cell.training}</span>
+            {cell.trainer && <p style={{ fontSize: 9, color: "#777", lineHeight: 1.1, marginTop: 1, textAlign: "center" }}>{cell.trainer}</p>}
+          </div>
+        )}
+      </>
     );
   }
 
@@ -364,6 +368,8 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     const showHallCol = rows.some((r) => r.entries.length > 1);
     const gridCols = showHallCol ? `64px 56px repeat(7, 1fr)` : `64px repeat(7, 1fr)`;
 
+    const totalSubRows = rows.reduce((s, r) => s + r.entries.length, 0) || 1;
+
     return (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
         <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4 }}>
@@ -372,16 +378,16 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
           {DAYS.map((d) => <div key={d}>{hdrCell(d)}</div>)}
         </div>
         {rows.map((row, ri) => (
-          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2, flex: `${row.entries.length} 1 0%` }}>
             {row.entries.map((entry, ei) => (
-              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, minHeight: 40 }}>
+              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: `1 1 calc(100% / ${totalSubRows})`, minHeight: 36 }}>
                 {ei === 0 ? (
-                  <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", gridRow: row.entries.length > 1 ? `span ${row.entries.length}` : undefined }}>
+                  <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", gridRow: row.entries.length > 1 ? `span ${row.entries.length}` : undefined, height: "100%" }}>
                     <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: "#1a1a2e" }}>{row.time}</span>
                   </div>
                 ) : <div />}
                 {showHallCol && (
-                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 2px", overflow: "hidden" }}>
+                  <div style={{ borderRadius: 8, background: "#f5f0fa", display: "flex", alignItems: "center", justifyContent: "center", padding: "2px 2px", overflow: "hidden", height: "100%" }}>
                     <span style={{ fontSize: Math.min(9, entry.hallName.length > 6 ? 7 : 9), fontWeight: 600, color: "#7c5cbf", textAlign: "center", lineHeight: 1.1, wordBreak: "break-word", overflow: "hidden", maxWidth: "100%" }}>{entry.hallName}</span>
                   </div>
                 )}
