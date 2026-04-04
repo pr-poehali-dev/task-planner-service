@@ -159,6 +159,18 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     });
   }
 
+  function clearCell(row: number, col: number) {
+    updateSchedule((s) => {
+      const halls = [...s.halls];
+      const slots = [...halls[activeHallIdx].timeSlots];
+      const cells = [...slots[row].cells];
+      cells[col] = { training: "", trainer: "", colorId: "none", paid: false };
+      slots[row] = { ...slots[row], cells };
+      halls[activeHallIdx] = { ...halls[activeHallIdx], timeSlots: slots };
+      return { ...s, halls };
+    });
+  }
+
   function updateTime(row: number, value: string) {
     updateSchedule((s) => {
       const halls = [...s.halls];
@@ -215,7 +227,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     setExporting(true);
     resetEditing();
     setShowExportMenu(false);
-    await new Promise((r) => setTimeout(r, 250));
+    await new Promise((r) => setTimeout(r, 400));
     try {
       const canvas = await html2canvas(tableRef.current, { scale: 3, backgroundColor: "#ffffff", useCORS: true });
       if (format === "png") {
@@ -303,8 +315,8 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
               </button>
               <button onClick={(e) => { e.stopPropagation(); updateCell(ri, ci, "paid", !cell.paid); }}
                 style={{ fontSize: 9, color: cell.paid ? "#7c5cbf" : "#bbb", background: "none", border: "none", cursor: "pointer", fontWeight: cell.paid ? 700 : 400 }}>$ {cell.paid ? "✓" : ""}</button>
-              {(cell.training || cell.trainer) && (
-                <button onClick={(e) => { e.stopPropagation(); updateCell(ri, ci, "training", ""); updateCell(ri, ci, "trainer", ""); updateCell(ri, ci, "colorId", "none"); updateCell(ri, ci, "paid", false); setEditingCell(null); setColorPickerFor(null); }}
+              {(cell.training || cell.trainer || cell.paid) && (
+                <button onClick={(e) => { e.stopPropagation(); clearCell(ri, ci); setEditingCell(null); setColorPickerFor(null); }}
                   style={{ fontSize: 9, color: "#e55", background: "none", border: "none", cursor: "pointer" }}>
                   <Icon name="Trash2" size={10} />
                 </button>
@@ -338,14 +350,14 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     const cnt = slots.length || 1;
     const gridCols = `64px repeat(7, 1fr)${!isExport ? " 28px" : ""}`;
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
+      <div style={{ flex: isExport ? "0 0 auto" : 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
         <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4 }}>
           {hdrCell("ВРЕМЯ")}
           {DAYS.map((d) => <div key={d}>{hdrCell(d)}</div>)}
           {!isExport && <div />}
         </div>
         {slots.map((slot, ri) => (
-          <div key={ri} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: `1 1 calc(100%/${cnt})`, minHeight: 40 }}>
+          <div key={ri} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: isExport ? "0 0 auto" : `1 1 calc(100%/${cnt})`, minHeight: isExport ? 32 : 40 }}>
             <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
               {!isExport && editingTime === ri ? (
                 <input autoFocus value={slot.time} onChange={(e) => updateTime(ri, e.target.value)} onBlur={() => setEditingTime(null)} onKeyDown={(e) => e.key === "Enter" && setEditingTime(null)}
@@ -377,16 +389,16 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
     const totalSubRows = rows.reduce((s, r) => s + r.entries.length, 0) || 1;
 
     return (
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
+      <div style={{ flex: isExport ? "0 0 auto" : 1, display: "flex", flexDirection: "column", gap: 4, minHeight: 0 }}>
         <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4 }}>
           {hdrCell("ВРЕМЯ")}
           {showHallCol && hdrCell("ЗАЛ")}
           {DAYS.map((d) => <div key={d}>{hdrCell(d)}</div>)}
         </div>
         {rows.map((row, ri) => (
-          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2, flex: `${row.entries.length} 1 0%` }}>
+          <div key={ri} style={{ display: "flex", flexDirection: "column", gap: 2, flex: isExport ? "0 0 auto" : `${row.entries.length} 1 0%` }}>
             {row.entries.map((entry, ei) => (
-              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: `1 1 calc(100% / ${totalSubRows})`, minHeight: 36 }}>
+              <div key={ei} style={{ display: "grid", gridTemplateColumns: gridCols, gap: 4, flex: isExport ? "0 0 auto" : `1 1 calc(100% / ${totalSubRows})`, minHeight: isExport ? 32 : 36 }}>
                 {ei === 0 ? (
                   <div style={{ borderRadius: 10, background: "#f0edf5", display: "flex", alignItems: "center", justifyContent: "center", gridRow: row.entries.length > 1 ? `span ${row.entries.length}` : undefined, height: "100%" }}>
                     <span style={{ fontSize: 12, fontWeight: 800, fontFamily: "monospace", color: "#1a1a2e" }}>{row.time}</span>
@@ -483,7 +495,7 @@ export default function SchedulePage({ branches, schedules, onSchedulesChange }:
       </div>
 
       <div ref={tableRef} className="bg-white rounded-2xl overflow-hidden"
-        style={{ aspectRatio: `${ASPECT}`, padding: exporting ? "28px 32px 20px" : "20px 24px 16px", display: "flex", flexDirection: "column" }}>
+        style={{ aspectRatio: exporting ? undefined : `${ASPECT}`, padding: exporting ? "28px 32px 20px" : "20px 24px 16px", display: "flex", flexDirection: "column" }}>
 
         {(exporting ? exportOpts.showTitle : true) && (
           <div style={{ marginBottom: exporting ? 14 : 10, textAlign: "left" }}>
