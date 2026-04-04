@@ -8,6 +8,7 @@ import StatisticsPage from "@/pages/StatisticsPage";
 import ProfilePage from "@/pages/ProfilePage";
 import NotesPage from "@/pages/NotesPage";
 import FilesPage from "@/pages/FilesPage";
+import SchedulePage from "@/pages/SchedulePage";
 import Icon from "@/components/ui/icon";
 import {
   MOCK_BRANCHES,
@@ -444,6 +445,13 @@ export default function Index() {
           groupGoals={visibleGoals}
           groupTasks={visibleGroupTasks}
           currentMonth={currentMonth}
+        />
+      )}
+      {activePage === "schedule" && (
+        <SchedulePage
+          currentUser={currentUser}
+          branches={isDirector ? branches : visibleBranches}
+          employees={employees}
         />
       )}
       {activePage === "notes" && (

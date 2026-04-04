@@ -13,6 +13,7 @@ const ALL_NAV_ITEMS: NavItem[] = [
   { id: "team", label: "Командный", icon: "Users" },
   { id: "management", label: "Управление", icon: "Settings2" },
   { id: "statistics", label: "Статистика", icon: "BarChart2" },
+  { id: "schedule", label: "Расписание", icon: "Calendar" },
   { id: "notes", label: "Заметки", icon: "StickyNote" },
   { id: "files", label: "Файлы", icon: "FolderOpen" },
   { id: "profile", label: "Профиль", icon: "User" },
